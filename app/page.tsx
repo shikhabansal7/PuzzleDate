@@ -54,7 +54,7 @@ const puzzles = [
   {
     name: "Word Salad",
     publisher: "Daily themed word puzzle",
-    url: "https://wordsalad.app/",
+    url: "https://wordsalad.online/",
     color: "#8fc9bd",
   },
 ];
