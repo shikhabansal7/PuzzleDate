@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Puzzle Date",
   description:
-    "A focused daily puzzle rotation with Connections, Word 500, and FoxiMax.",
+    "A focused rotation of daily word games and puzzles.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

@@ -21,6 +21,42 @@ const puzzles = [
     url: "https://foximax.com/",
     color: "#f39c81",
   },
+  {
+    name: "Verticle",
+    publisher: "Daily word ladder",
+    url: "https://verticle.netlify.app/",
+    color: "#9cc8a7",
+  },
+  {
+    name: "Waffle",
+    publisher: "Daily word puzzle",
+    url: "https://wafflegame.net/daily",
+    color: "#e9b949",
+  },
+  {
+    name: "Unwordle",
+    publisher: "Daily reverse Wordle",
+    url: "https://unwordle.org/?daily=1",
+    color: "#88b8dc",
+  },
+  {
+    name: "Lin.io",
+    publisher: "Hank Green 4×3",
+    url: "https://playlin.io/game/hank-green-4x3/",
+    color: "#e893bd",
+  },
+  {
+    name: "Chain It",
+    publisher: "Puzzlit daily word chain",
+    url: "https://www.puzzlitapp.com/game/ChainIt",
+    color: "#a995d6",
+  },
+  {
+    name: "Word Salad",
+    publisher: "Daily themed word puzzle",
+    url: "https://wordsalad.app/",
+    color: "#8fc9bd",
+  },
 ];
 
 export default function Home() {
