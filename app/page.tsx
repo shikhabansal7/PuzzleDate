@@ -57,6 +57,12 @@ const puzzles = [
     url: "https://wordsalad.online/",
     color: "#8fc9bd",
   },
+  {
+    name: "Poople",
+    publisher: "Daily guessing game",
+    url: "https://poople.io/",
+    color: "#d5a47a",
+  },
 ];
 
 export default function Home() {
