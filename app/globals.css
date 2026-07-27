@@ -132,6 +132,27 @@ h1 {
   border-color: var(--green);
 }
 
+.header-actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.reset-button {
+  border: 0;
+  background: transparent;
+  color: #777a73;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 7px 0;
+}
+
+.reset-button:hover {
+  color: var(--green);
+}
+
 .frame-wrap {
   min-height: 0;
   overflow: hidden;
@@ -139,6 +160,51 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: 0 12px 35px rgba(59, 55, 44, 0.08);
+}
+
+.external-game {
+  width: min(460px, calc(100% - 40px));
+  height: 100%;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.external-dot {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 10px rgba(0, 0, 0, 0.035);
+}
+
+.external-game h2 {
+  margin: 4px 0 10px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(32px, 5vw, 54px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.external-game > p:not(.eyebrow) {
+  max-width: 390px;
+  margin: 0 0 22px;
+  color: #6f716b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.external-game a {
+  border-radius: 11px;
+  background: var(--green);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 13px 18px;
+  text-decoration: none;
 }
 
 iframe {
@@ -262,6 +328,14 @@ iframe {
 
   .open-link {
     font-size: 0;
+  }
+
+  .header-actions {
+    gap: 9px;
+  }
+
+  .reset-button {
+    font-size: 9px;
   }
 
   .open-link span {

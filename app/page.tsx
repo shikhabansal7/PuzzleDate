@@ -2,12 +2,21 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const puzzles = [
+type Puzzle = {
+  name: string;
+  publisher: string;
+  url: string;
+  color: string;
+  canEmbed?: boolean;
+};
+
+const puzzles: Puzzle[] = [
   {
     name: "Connections",
     publisher: "The New York Times",
     url: "https://www.nytimes.com/games/connections",
     color: "#b4a8ff",
+    canEmbed: false,
   },
   {
     name: "Word 500",
@@ -20,6 +29,7 @@ const puzzles = [
     publisher: "Daily puzzle",
     url: "https://foximax.com/",
     color: "#f39c81",
+    canEmbed: false,
   },
   {
     name: "Verticle",
@@ -32,6 +42,7 @@ const puzzles = [
     publisher: "Daily word puzzle",
     url: "https://wafflegame.net/daily",
     color: "#e9b949",
+    canEmbed: false,
   },
   {
     name: "Unwordle",
@@ -65,17 +76,89 @@ const puzzles = [
   },
 ];
 
+const getTodayKey = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+};
+
+const shuffleForDay = (items: Puzzle[], date: string) => {
+  const shuffled = [...items];
+  let seed = [...date].reduce(
+    (hash, character) =>
+      (hash * 31 + character.charCodeAt(0)) >>> 0,
+    2166136261,
+  );
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const swapIndex = seed % (index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [
+      shuffled[swapIndex],
+      shuffled[index],
+    ];
+  }
+
+  return shuffled;
+};
+
 export default function Home() {
+  const [dailyPuzzles, setDailyPuzzles] = useState(puzzles);
   const [activeIndex, setActiveIndex] = useState(0);
-  const activePuzzle = puzzles[activeIndex];
+  const [frameVersion, setFrameVersion] = useState(0);
+  const activePuzzle = dailyPuzzles[activeIndex];
+
+  useEffect(() => {
+    const today = getTodayKey();
+    const storageKey = "puzzle-date-daily-order";
+    const stored = window.localStorage.getItem(storageKey);
+
+    if (stored) {
+      try {
+        const saved = JSON.parse(stored) as { date: string; names: string[] };
+        if (saved.date === today) {
+          const restored = saved.names
+            .map((name) => puzzles.find((puzzle) => puzzle.name === name))
+            .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));
+
+          if (restored.length === puzzles.length) {
+            setDailyPuzzles(restored);
+            return;
+          }
+        }
+      } catch {
+        // Invalid app-owned state is replaced with today's rotation below.
+      }
+    }
+
+    const shuffled = shuffleForDay(puzzles, today);
+    setDailyPuzzles(shuffled);
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ date: today, names: shuffled.map(({ name }) => name) }),
+    );
+  }, []);
+
+  const goToPuzzle = useCallback(
+    (nextIndex: number, openExternal = true) => {
+      const normalizedIndex =
+        (nextIndex + dailyPuzzles.length) % dailyPuzzles.length;
+      const nextPuzzle = dailyPuzzles[normalizedIndex];
+
+      setActiveIndex(normalizedIndex);
+      if (openExternal && nextPuzzle.canEmbed === false) {
+        window.open(nextPuzzle.url, "_blank", "noopener,noreferrer");
+      }
+    },
+    [dailyPuzzles],
+  );
 
   const goPrevious = useCallback(() => {
-    setActiveIndex((current) => (current - 1 + puzzles.length) % puzzles.length);
-  }, []);
+    goToPuzzle(activeIndex - 1);
+  }, [activeIndex, goToPuzzle]);
 
   const goNext = useCallback(() => {
-    setActiveIndex((current) => (current + 1) % puzzles.length);
-  }, []);
+    goToPuzzle(activeIndex + 1);
+  }, [activeIndex, goToPuzzle]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -86,6 +169,12 @@ export default function Home() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goNext, goPrevious]);
+
+  const resetApp = () => {
+    window.localStorage.removeItem("puzzle-date-daily-order");
+    setFrameVersion((version) => version + 1);
+    setActiveIndex(0);
+  };
 
   return (
     <main className="app-shell">
@@ -112,25 +201,54 @@ export default function Home() {
           </div>
         </div>
 
-        <a
-          className="open-link"
-          href={activePuzzle.url}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`Open ${activePuzzle.name} in a new tab`}
-        >
-          Open directly <span aria-hidden="true">↗</span>
-        </a>
+        <div className="header-actions">
+          <button
+            className="reset-button"
+            type="button"
+            onClick={resetApp}
+            title="Reset Puzzle Date’s daily order and reload this game"
+          >
+            Reset app
+          </button>
+          <a
+            className="open-link"
+            href={activePuzzle.url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open ${activePuzzle.name} in a new tab`}
+          >
+            Open directly <span aria-hidden="true">↗</span>
+          </a>
+        </div>
       </header>
 
       <section className="frame-wrap" aria-label={`${activePuzzle.name} puzzle`}>
-        <iframe
-          key={activePuzzle.url}
-          src={activePuzzle.url}
-          title={activePuzzle.name}
-          referrerPolicy="strict-origin-when-cross-origin"
-          allow="fullscreen; clipboard-read; clipboard-write"
-        />
+        {activePuzzle.canEmbed === false ? (
+          <div className="external-game">
+            <span
+              className="external-dot"
+              style={{ backgroundColor: activePuzzle.color }}
+              aria-hidden="true"
+            />
+            <p className="eyebrow">Opened in a new tab</p>
+            <h2>{activePuzzle.name}</h2>
+            <p>
+              This game does not allow embedding. Playing it on its own site
+              also gives it the best chance to keep your progress.
+            </p>
+            <a href={activePuzzle.url} target="_blank" rel="noreferrer">
+              Open {activePuzzle.name} <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        ) : (
+          <iframe
+            key={`${activePuzzle.url}-${frameVersion}`}
+            src={activePuzzle.url}
+            title={activePuzzle.name}
+            referrerPolicy="strict-origin-when-cross-origin"
+            allow="fullscreen; clipboard-read; clipboard-write; storage-access"
+          />
+        )}
       </section>
 
       <nav className="controls" aria-label="Puzzle navigation">
@@ -143,15 +261,15 @@ export default function Home() {
           <span className="count">
             {String(activeIndex + 1).padStart(2, "0")}
             <span aria-hidden="true"> / </span>
-            {String(puzzles.length).padStart(2, "0")}
+            {String(dailyPuzzles.length).padStart(2, "0")}
           </span>
           <div className="steps" aria-hidden="true">
-            {puzzles.map((puzzle, index) => (
+            {dailyPuzzles.map((puzzle, index) => (
               <button
                 key={puzzle.name}
                 type="button"
                 className={index === activeIndex ? "active" : ""}
-                onClick={() => setActiveIndex(index)}
+                onClick={() => goToPuzzle(index)}
                 tabIndex={-1}
               />
             ))}
