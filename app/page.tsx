@@ -16,6 +16,7 @@ const puzzles: Puzzle[] = [
     publisher: "The New York Times",
     url: "https://www.nytimes.com/games/connections",
     color: "#b4a8ff",
+    canEmbed: false,
   },
   {
     name: "Word 500",
@@ -95,6 +96,16 @@ export default function Home() {
   const [frameVersion, setFrameVersion] = useState(0);
   const activePuzzle = orderedPuzzles[activeIndex];
 
+  const openInNewTab = useCallback((puzzle: Puzzle) => {
+    const link = document.createElement("a");
+    link.href = puzzle.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }, []);
+
   useEffect(() => {
     const stored = window.localStorage.getItem("puzzle-date-order");
 
@@ -125,10 +136,10 @@ export default function Home() {
 
       setActiveIndex(normalizedIndex);
       if (openExternal && nextPuzzle.canEmbed === false) {
-        window.open(nextPuzzle.url, "_blank", "noopener,noreferrer");
+        openInNewTab(nextPuzzle);
       }
     },
-    [orderedPuzzles],
+    [openInNewTab, orderedPuzzles],
   );
 
   const goPrevious = useCallback(() => {
