@@ -134,11 +134,10 @@ export default function Home() {
 
   const goToPuzzle = useCallback(
     (nextIndex: number, openExternal = true) => {
-      const normalizedIndex =
-        (nextIndex + orderedPuzzles.length) % orderedPuzzles.length;
-      const nextPuzzle = orderedPuzzles[normalizedIndex];
+      if (nextIndex < 0 || nextIndex >= orderedPuzzles.length) return;
+      const nextPuzzle = orderedPuzzles[nextIndex];
 
-      setActiveIndex(normalizedIndex);
+      setActiveIndex(nextIndex);
       if (openExternal && nextPuzzle.canEmbed === false) {
         openInNewTab(nextPuzzle);
       }
@@ -259,10 +258,14 @@ export default function Home() {
       </section>
 
       <nav className="controls" aria-label="Puzzle navigation">
-        <button type="button" onClick={goPrevious} aria-label="Previous puzzle">
-          <span aria-hidden="true">←</span>
-          <span className="button-label">Previous</span>
-        </button>
+        {activeIndex > 0 ? (
+          <button type="button" onClick={goPrevious} aria-label="Previous puzzle">
+            <span aria-hidden="true">←</span>
+            <span className="button-label">Previous</span>
+          </button>
+        ) : (
+          <span className="control-placeholder" aria-hidden="true" />
+        )}
 
         <div className="progress">
           <span className="count">
@@ -284,10 +287,14 @@ export default function Home() {
           <span className="shortcut">Use ← → keys</span>
         </div>
 
-        <button type="button" onClick={goNext} aria-label="Next puzzle">
-          <span className="button-label">Next</span>
-          <span aria-hidden="true">→</span>
-        </button>
+        {activeIndex < orderedPuzzles.length - 1 ? (
+          <button type="button" onClick={goNext} aria-label="Next puzzle">
+            <span className="button-label">Next</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        ) : (
+          <span className="control-placeholder" aria-hidden="true" />
+        )}
       </nav>
     </main>
   );
