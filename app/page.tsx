@@ -59,6 +59,7 @@ const puzzles: Puzzle[] = [
     publisher: "Hank Green",
     url: "https://www.hankgreen.com/fourbythree/",
     color: "#e893bd",
+    canEmbed: false,
   },
   {
     name: "Chain It",
