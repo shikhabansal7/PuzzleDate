@@ -8,6 +8,7 @@ type Puzzle = {
   url: string;
   color: string;
   canEmbed?: boolean;
+  canReset?: boolean;
 };
 
 const puzzles: Puzzle[] = [
@@ -21,7 +22,7 @@ const puzzles: Puzzle[] = [
   {
     name: "Word 500",
     publisher: "Daily word challenge",
-    url: "https://word500.com/",
+    url: "https://word500.com/game?mode=daily",
     color: "#f3c96b",
   },
   {
@@ -36,6 +37,7 @@ const puzzles: Puzzle[] = [
     publisher: "Daily word ladder",
     url: "https://verticle.netlify.app/",
     color: "#9cc8a7",
+    canReset: false,
   },
   {
     name: "Waffle",
@@ -203,7 +205,7 @@ export default function Home() {
           <button className="utility-button" type="button" onClick={shuffleRest}>
             Shuffle rest
           </button>
-          {activePuzzle.canEmbed !== false && (
+          {activePuzzle.canEmbed !== false && activePuzzle.canReset !== false && (
             <button
               className="utility-button"
               type="button"
