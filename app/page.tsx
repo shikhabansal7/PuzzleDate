@@ -24,6 +24,7 @@ const puzzles: Puzzle[] = [
     publisher: "Daily word challenge",
     url: "https://word500.com/game?mode=daily",
     color: "#f3c96b",
+    canReset: true,
   },
   {
     name: "FoxiMax",
@@ -51,6 +52,7 @@ const puzzles: Puzzle[] = [
     publisher: "Daily reverse Wordle",
     url: "https://unwordle.org/?daily=1",
     color: "#88b8dc",
+    canReset: false,
   },
   {
     name: "Lin.io",
@@ -205,13 +207,13 @@ export default function Home() {
           <button className="utility-button" type="button" onClick={shuffleRest}>
             Shuffle rest
           </button>
-          {activePuzzle.canEmbed !== false && activePuzzle.canReset !== false && (
+          {activePuzzle.canEmbed !== false && activePuzzle.canReset === true && (
             <button
               className="utility-button"
               type="button"
               onClick={reloadGame}
             >
-              Reload game
+              Start Over
             </button>
           )}
           <a
@@ -251,6 +253,7 @@ export default function Home() {
             title={activePuzzle.name}
             referrerPolicy="strict-origin-when-cross-origin"
             allow="fullscreen; clipboard-read; clipboard-write; storage-access"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-presentation"
           />
         )}
       </section>
