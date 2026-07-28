@@ -16,7 +16,6 @@ const puzzles: Puzzle[] = [
     publisher: "The New York Times",
     url: "https://www.nytimes.com/games/connections",
     color: "#b4a8ff",
-    canEmbed: false,
   },
   {
     name: "Word 500",
@@ -76,22 +75,11 @@ const puzzles: Puzzle[] = [
   },
 ];
 
-const getTodayKey = () => {
-  const today = new Date();
-  return `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
-};
-
-const shuffleForDay = (items: Puzzle[], date: string) => {
+const shuffle = (items: Puzzle[]) => {
   const shuffled = [...items];
-  let seed = [...date].reduce(
-    (hash, character) =>
-      (hash * 31 + character.charCodeAt(0)) >>> 0,
-    2166136261,
-  );
 
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    const swapIndex = seed % (index + 1);
+    const swapIndex = Math.floor(Math.random() * (index + 1));
     [shuffled[index], shuffled[swapIndex]] = [
       shuffled[swapIndex],
       shuffled[index],
@@ -102,54 +90,45 @@ const shuffleForDay = (items: Puzzle[], date: string) => {
 };
 
 export default function Home() {
-  const [dailyPuzzles, setDailyPuzzles] = useState(puzzles);
+  const [orderedPuzzles, setOrderedPuzzles] = useState(puzzles);
   const [activeIndex, setActiveIndex] = useState(0);
   const [frameVersion, setFrameVersion] = useState(0);
-  const activePuzzle = dailyPuzzles[activeIndex];
+  const activePuzzle = orderedPuzzles[activeIndex];
 
   useEffect(() => {
-    const today = getTodayKey();
-    const storageKey = "puzzle-date-daily-order";
-    const stored = window.localStorage.getItem(storageKey);
+    const stored = window.localStorage.getItem("puzzle-date-order");
 
     if (stored) {
       try {
-        const saved = JSON.parse(stored) as { date: string; names: string[] };
-        if (saved.date === today) {
-          const restored = saved.names
-            .map((name) => puzzles.find((puzzle) => puzzle.name === name))
-            .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));
+        const names = JSON.parse(stored) as string[];
+        const restored = names
+          .map((name) => puzzles.find((puzzle) => puzzle.name === name))
+          .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));
 
-          if (restored.length === puzzles.length) {
-            setDailyPuzzles(restored);
-            return;
-          }
+        if (
+          restored.length === puzzles.length &&
+          restored[0].name === "Connections"
+        ) {
+          setOrderedPuzzles(restored);
         }
       } catch {
-        // Invalid app-owned state is replaced with today's rotation below.
+        window.localStorage.removeItem("puzzle-date-order");
       }
     }
-
-    const shuffled = shuffleForDay(puzzles, today);
-    setDailyPuzzles(shuffled);
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify({ date: today, names: shuffled.map(({ name }) => name) }),
-    );
   }, []);
 
   const goToPuzzle = useCallback(
     (nextIndex: number, openExternal = true) => {
       const normalizedIndex =
-        (nextIndex + dailyPuzzles.length) % dailyPuzzles.length;
-      const nextPuzzle = dailyPuzzles[normalizedIndex];
+        (nextIndex + orderedPuzzles.length) % orderedPuzzles.length;
+      const nextPuzzle = orderedPuzzles[normalizedIndex];
 
       setActiveIndex(normalizedIndex);
       if (openExternal && nextPuzzle.canEmbed === false) {
         window.open(nextPuzzle.url, "_blank", "noopener,noreferrer");
       }
     },
-    [dailyPuzzles],
+    [orderedPuzzles],
   );
 
   const goPrevious = useCallback(() => {
@@ -170,10 +149,18 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goNext, goPrevious]);
 
-  const resetApp = () => {
-    window.localStorage.removeItem("puzzle-date-daily-order");
+  const reloadGame = () => {
     setFrameVersion((version) => version + 1);
+  };
+
+  const shuffleRest = () => {
+    const nextOrder = [puzzles[0], ...shuffle(puzzles.slice(1))];
+    setOrderedPuzzles(nextOrder);
     setActiveIndex(0);
+    window.localStorage.setItem(
+      "puzzle-date-order",
+      JSON.stringify(nextOrder.map(({ name }) => name)),
+    );
   };
 
   return (
@@ -202,14 +189,18 @@ export default function Home() {
         </div>
 
         <div className="header-actions">
-          <button
-            className="reset-button"
-            type="button"
-            onClick={resetApp}
-            title="Reset Puzzle Date’s daily order and reload this game"
-          >
-            Reset app
+          <button className="utility-button" type="button" onClick={shuffleRest}>
+            Shuffle rest
           </button>
+          {activePuzzle.canEmbed !== false && (
+            <button
+              className="utility-button"
+              type="button"
+              onClick={reloadGame}
+            >
+              Reload game
+            </button>
+          )}
           <a
             className="open-link"
             href={activePuzzle.url}
@@ -261,10 +252,10 @@ export default function Home() {
           <span className="count">
             {String(activeIndex + 1).padStart(2, "0")}
             <span aria-hidden="true"> / </span>
-            {String(dailyPuzzles.length).padStart(2, "0")}
+            {String(orderedPuzzles.length).padStart(2, "0")}
           </span>
           <div className="steps" aria-hidden="true">
-            {dailyPuzzles.map((puzzle, index) => (
+            {orderedPuzzles.map((puzzle, index) => (
               <button
                 key={puzzle.name}
                 type="button"

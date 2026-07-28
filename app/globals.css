@@ -139,17 +139,20 @@ h1 {
   gap: 14px;
 }
 
-.reset-button {
-  border: 0;
-  background: transparent;
-  color: #777a73;
+.utility-button {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  padding: 7px 0;
+  padding: 8px 10px;
+  white-space: nowrap;
 }
 
-.reset-button:hover {
+.utility-button:hover {
+  border-color: var(--green);
   color: var(--green);
 }
 
@@ -334,8 +337,9 @@ iframe {
     gap: 9px;
   }
 
-  .reset-button {
-    font-size: 9px;
+  .utility-button {
+    padding: 7px 8px;
+    font-size: 8px;
   }
 
   .open-link span {
