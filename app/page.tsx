@@ -55,9 +55,9 @@ const puzzles: Puzzle[] = [
     canReset: false,
   },
   {
-    name: "Lin.io",
-    publisher: "Hank Green 4×3",
-    url: "https://playlin.io/game/hank-green-4x3/",
+    name: "4 × 3",
+    publisher: "Hank Green",
+    url: "https://www.hankgreen.com/fourbythree/",
     color: "#e893bd",
   },
   {
