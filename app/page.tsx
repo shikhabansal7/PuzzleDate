@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Puzzle = {
   name: string;
@@ -96,6 +96,7 @@ const shuffle = (items: Puzzle[]) => {
 };
 
 export default function Home() {
+  const appShellRef = useRef<HTMLElement>(null);
   const [orderedPuzzles, setOrderedPuzzles] = useState(puzzles);
   const [activeIndex, setActiveIndex] = useState(0);
   const [frameVersion, setFrameVersion] = useState(0);
@@ -179,7 +180,7 @@ export default function Home() {
   };
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" ref={appShellRef} tabIndex={-1}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
@@ -216,15 +217,6 @@ export default function Home() {
               Start Over
             </button>
           )}
-          <a
-            className="open-link"
-            href={activePuzzle.url}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={`Open ${activePuzzle.name} in a new tab`}
-          >
-            Open directly <span aria-hidden="true">↗</span>
-          </a>
         </div>
       </header>
 
@@ -254,11 +246,16 @@ export default function Home() {
             referrerPolicy="strict-origin-when-cross-origin"
             allow="fullscreen; clipboard-read; clipboard-write; storage-access"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-presentation"
+            onPointerLeave={() => appShellRef.current?.focus()}
           />
         )}
       </section>
 
-      <nav className="controls" aria-label="Puzzle navigation">
+      <nav
+        className="controls"
+        aria-label="Puzzle navigation"
+        onPointerEnter={() => appShellRef.current?.focus()}
+      >
         {activeIndex > 0 ? (
           <button type="button" onClick={goPrevious} aria-label="Previous puzzle">
             <span aria-hidden="true">←</span>
