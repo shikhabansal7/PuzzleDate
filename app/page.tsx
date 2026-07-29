@@ -9,6 +9,7 @@ type Puzzle = {
   color: string;
   canEmbed?: boolean;
   canReset?: boolean;
+  fridayOnly?: boolean;
 };
 
 const puzzles: Puzzle[] = [
@@ -74,12 +75,24 @@ const puzzles: Puzzle[] = [
     color: "#8fc9bd",
   },
   {
+    name: "Full Circle Friday",
+    publisher: "Weekly Friday word puzzle",
+    url: "https://fullcirclefriday.com/fullcircle.html",
+    color: "#f08b62",
+    fridayOnly: true,
+  },
+  {
     name: "Poople",
     publisher: "Daily guessing game",
     url: "https://poople.io/",
     color: "#d5a47a",
   },
 ];
+
+const puzzlesForDay = (day: number) =>
+  puzzles.filter((puzzle) => !puzzle.fridayOnly || day === 5);
+
+const defaultPuzzles = puzzlesForDay(-1);
 
 const shuffle = (items: Puzzle[]) => {
   const shuffled = [...items];
@@ -97,7 +110,7 @@ const shuffle = (items: Puzzle[]) => {
 
 export default function Home() {
   const appShellRef = useRef<HTMLElement>(null);
-  const [orderedPuzzles, setOrderedPuzzles] = useState(puzzles);
+  const [orderedPuzzles, setOrderedPuzzles] = useState(defaultPuzzles);
   const [activeIndex, setActiveIndex] = useState(0);
   const [frameVersion, setFrameVersion] = useState(0);
   const activePuzzle = orderedPuzzles[activeIndex];
@@ -113,25 +126,31 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const availablePuzzles = puzzlesForDay(new Date().getDay());
     const stored = window.localStorage.getItem("puzzle-date-order");
 
     if (stored) {
       try {
         const names = JSON.parse(stored) as string[];
         const restored = names
-          .map((name) => puzzles.find((puzzle) => puzzle.name === name))
+          .map((name) =>
+            availablePuzzles.find((puzzle) => puzzle.name === name),
+          )
           .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));
 
         if (
-          restored.length === puzzles.length &&
+          restored.length === availablePuzzles.length &&
           restored[0].name === "Connections"
         ) {
           setOrderedPuzzles(restored);
+          return;
         }
       } catch {
         window.localStorage.removeItem("puzzle-date-order");
       }
     }
+
+    setOrderedPuzzles(availablePuzzles);
   }, []);
 
   const goToPuzzle = useCallback(
@@ -170,7 +189,10 @@ export default function Home() {
   };
 
   const shuffleRest = () => {
-    const nextOrder = [puzzles[0], ...shuffle(puzzles.slice(1))];
+    const nextOrder = [
+      orderedPuzzles[0],
+      ...shuffle(orderedPuzzles.slice(1)),
+    ];
     setOrderedPuzzles(nextOrder);
     setActiveIndex(0);
     window.localStorage.setItem(
