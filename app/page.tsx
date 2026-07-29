@@ -10,6 +10,7 @@ type Puzzle = {
   canEmbed?: boolean;
   canReset?: boolean;
   fridayOnly?: boolean;
+  custom?: boolean;
 };
 
 const puzzles: Puzzle[] = [
@@ -111,8 +112,12 @@ const shuffle = (items: Puzzle[]) => {
 export default function Home() {
   const appShellRef = useRef<HTMLElement>(null);
   const [orderedPuzzles, setOrderedPuzzles] = useState(defaultPuzzles);
+  const [customPuzzles, setCustomPuzzles] = useState<Puzzle[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [frameVersion, setFrameVersion] = useState(0);
+  const [showAddGame, setShowAddGame] = useState(false);
+  const [newGameUrl, setNewGameUrl] = useState("");
+  const [addGameError, setAddGameError] = useState("");
   const activePuzzle = orderedPuzzles[activeIndex];
 
   const openInNewTab = useCallback((puzzle: Puzzle) => {
@@ -126,15 +131,52 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const availablePuzzles = puzzlesForDay(new Date().getDay());
+    let savedCustomPuzzles: Puzzle[] = [];
+    const customGames = window.localStorage.getItem("puzzle-date-custom-games");
+
+    if (customGames) {
+      try {
+        const savedGames = JSON.parse(customGames) as Array<{
+          name: string;
+          url: string;
+        }>;
+
+        savedCustomPuzzles = savedGames.flatMap(({ name, url }) => {
+          try {
+            const parsedUrl = new URL(url);
+            if (!["http:", "https:"].includes(parsedUrl.protocol)) return [];
+            return [{
+              name,
+              publisher: "Your added game",
+              url: parsedUrl.href,
+              color: "#72b6a7",
+              custom: true,
+            }];
+          } catch {
+            return [];
+          }
+        });
+      } catch {
+        window.localStorage.removeItem("puzzle-date-custom-games");
+      }
+    }
+
+    setCustomPuzzles(savedCustomPuzzles);
+    const availablePuzzles = [
+      ...puzzlesForDay(new Date().getDay()),
+      ...savedCustomPuzzles,
+    ];
     const stored = window.localStorage.getItem("puzzle-date-order");
 
     if (stored) {
       try {
-        const names = JSON.parse(stored) as string[];
-        const restored = names
-          .map((name) =>
-            availablePuzzles.find((puzzle) => puzzle.name === name),
+        const puzzleIds = JSON.parse(stored) as string[];
+        const restored = puzzleIds
+          .map((puzzleId) =>
+            availablePuzzles.find(
+              (puzzle) =>
+                puzzle.url === puzzleId || puzzle.name === puzzleId,
+            ),
           )
           .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));
 
@@ -176,6 +218,13 @@ export default function Home() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.matches("input, textarea, select") ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
       if (event.key === "ArrowLeft") goPrevious();
       if (event.key === "ArrowRight") goNext();
     };
@@ -197,8 +246,58 @@ export default function Home() {
     setActiveIndex(0);
     window.localStorage.setItem(
       "puzzle-date-order",
-      JSON.stringify(nextOrder.map(({ name }) => name)),
+      JSON.stringify(nextOrder.map(({ url }) => url)),
     );
+  };
+
+  const addCustomGame = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    try {
+      const parsedUrl = new URL(newGameUrl.trim());
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        throw new Error("unsupported protocol");
+      }
+
+      if (orderedPuzzles.some((puzzle) => puzzle.url === parsedUrl.href)) {
+        setAddGameError("That game is already in your rotation.");
+        return;
+      }
+
+      const domainName = parsedUrl.hostname
+        .replace(/^www\./, "")
+        .split(".")[0]
+        .replace(/[-_]+/g, " ")
+        .replace(/\b\w/g, (character) => character.toUpperCase());
+      const newPuzzle: Puzzle = {
+        name: domainName || "Custom Game",
+        publisher: "Your added game",
+        url: parsedUrl.href,
+        color: "#72b6a7",
+        custom: true,
+      };
+      const nextCustomPuzzles = [...customPuzzles, newPuzzle];
+      const nextOrder = [...orderedPuzzles, newPuzzle];
+
+      setCustomPuzzles(nextCustomPuzzles);
+      setOrderedPuzzles(nextOrder);
+      setActiveIndex(nextOrder.length - 1);
+      window.localStorage.setItem(
+        "puzzle-date-custom-games",
+        JSON.stringify(
+          nextCustomPuzzles.map(({ name, url }) => ({ name, url })),
+        ),
+      );
+      window.localStorage.setItem(
+        "puzzle-date-order",
+        JSON.stringify(nextOrder.map(({ url }) => url)),
+      );
+      setNewGameUrl("");
+      setAddGameError("");
+      setShowAddGame(false);
+    } catch {
+      setAddGameError("Enter a complete link beginning with https://");
+    }
   };
 
   return (
@@ -239,8 +338,65 @@ export default function Home() {
               Start Over
             </button>
           )}
+          <button
+            className="add-game-button"
+            type="button"
+            onClick={() => {
+              setAddGameError("");
+              setShowAddGame(true);
+            }}
+            aria-label="Add a game"
+            title="Add a game"
+          >
+            +
+          </button>
         </div>
       </header>
+
+      {showAddGame && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="add-game-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-game-title"
+          >
+            <button
+              className="modal-close"
+              type="button"
+              onClick={() => setShowAddGame(false)}
+              aria-label="Close add game"
+            >
+              ×
+            </button>
+            <p className="eyebrow">Your rotation</p>
+            <h2 id="add-game-title">Add a game</h2>
+            <p>Paste the game’s full web address.</p>
+            <form onSubmit={addCustomGame}>
+              <label htmlFor="new-game-url">Game link</label>
+              <input
+                id="new-game-url"
+                type="url"
+                inputMode="url"
+                placeholder="https://example.com/game"
+                value={newGameUrl}
+                onChange={(event) => {
+                  setNewGameUrl(event.target.value);
+                  setAddGameError("");
+                }}
+                autoFocus
+                required
+              />
+              {addGameError && (
+                <span className="form-error" role="alert">
+                  {addGameError}
+                </span>
+              )}
+              <button type="submit">Add to Puzzle Date</button>
+            </form>
+          </section>
+        </div>
+      )}
 
       <section className="frame-wrap" aria-label={`${activePuzzle.name} puzzle`}>
         {activePuzzle.canEmbed === false ? (
@@ -296,7 +452,7 @@ export default function Home() {
           <div className="steps" aria-hidden="true">
             {orderedPuzzles.map((puzzle, index) => (
               <button
-                key={puzzle.name}
+                key={puzzle.url}
                 type="button"
                 className={index === activeIndex ? "active" : ""}
                 onClick={() => goToPuzzle(index)}
