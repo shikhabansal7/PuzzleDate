@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Puzzle Date Game Reset",
+  "version": "1.0.0",
+  "description": "Lets Puzzle Date reset selected storage keys in the active embedded game.",
+  "permissions": ["activeTab", "scripting", "webNavigation"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "https://shikhabansal7.github.io/PuzzleDate/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

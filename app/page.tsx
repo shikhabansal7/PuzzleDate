@@ -9,6 +9,7 @@ type Puzzle = {
   color: string;
   canEmbed?: boolean;
   canReset?: boolean;
+  resetStorageKeys?: string[];
   fridayOnly?: boolean;
   custom?: boolean;
 };
@@ -27,6 +28,7 @@ const puzzles: Puzzle[] = [
     url: "https://word500.com/game?mode=daily",
     color: "#f3c96b",
     canReset: true,
+    resetStorageKeys: [],
   },
   {
     name: "FoxiMax",
@@ -40,7 +42,8 @@ const puzzles: Puzzle[] = [
     publisher: "Daily word ladder",
     url: "https://verticle.netlify.app/",
     color: "#9cc8a7",
-    canReset: false,
+    canReset: true,
+    resetStorageKeys: ["gameofthedaystate", "gamestate"],
   },
   {
     name: "Waffle",
@@ -87,6 +90,8 @@ const puzzles: Puzzle[] = [
     publisher: "Daily guessing game",
     url: "https://poople.io/",
     color: "#d5a47a",
+    canReset: true,
+    resetStorageKeys: ["guesses"],
   },
 ];
 
@@ -114,7 +119,6 @@ export default function Home() {
   const [orderedPuzzles, setOrderedPuzzles] = useState(defaultPuzzles);
   const [customPuzzles, setCustomPuzzles] = useState<Puzzle[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [frameVersion, setFrameVersion] = useState(0);
   const [showAddGame, setShowAddGame] = useState(false);
   const [newGameUrl, setNewGameUrl] = useState("");
   const [addGameError, setAddGameError] = useState("");
@@ -234,7 +238,11 @@ export default function Home() {
   }, [goNext, goPrevious]);
 
   const reloadGame = () => {
-    setFrameVersion((version) => version + 1);
+    window.dispatchEvent(
+      new CustomEvent("RESET_ACTIVE_IFRAME", {
+        detail: { keys: activePuzzle.resetStorageKeys ?? [] },
+      }),
+    );
   };
 
   const shuffleRest = () => {
@@ -418,7 +426,7 @@ export default function Home() {
           </div>
         ) : (
           <iframe
-            key={`${activePuzzle.url}-${frameVersion}`}
+            key={activePuzzle.url}
             src={activePuzzle.url}
             title={activePuzzle.name}
             referrerPolicy="strict-origin-when-cross-origin"
