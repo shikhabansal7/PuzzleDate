@@ -10,7 +10,7 @@ type Puzzle = {
   canEmbed?: boolean;
   canReset?: boolean;
   resetStorageKeys?: string[];
-  fridayOnly?: boolean;
+  saturdayOnly?: boolean;
   custom?: boolean;
 };
 
@@ -83,7 +83,7 @@ const puzzles: Puzzle[] = [
     publisher: "Weekly Friday word puzzle",
     url: "https://fullcirclefriday.com/fullcircle.html",
     color: "#f08b62",
-    fridayOnly: true,
+    saturdayOnly: true,
   },
   {
     name: "Poople",
@@ -96,7 +96,7 @@ const puzzles: Puzzle[] = [
 ];
 
 const puzzlesForDay = (day: number) =>
-  puzzles.filter((puzzle) => !puzzle.fridayOnly || day === 5);
+  puzzles.filter((puzzle) => !puzzle.saturdayOnly || day === 6);
 
 const defaultPuzzles = puzzlesForDay(-1);
 
