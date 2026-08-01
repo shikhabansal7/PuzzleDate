@@ -122,6 +122,10 @@ export default function Home() {
   const [showAddGame, setShowAddGame] = useState(false);
   const [newGameUrl, setNewGameUrl] = useState("");
   const [addGameError, setAddGameError] = useState("");
+  const [extensionStatus, setExtensionStatus] = useState<
+    "checking" | "ready" | "missing"
+  >("checking");
+  const [showExtensionGuide, setShowExtensionGuide] = useState(false);
   const activePuzzle = orderedPuzzles[activeIndex];
 
   const openInNewTab = useCallback((puzzle: Puzzle) => {
@@ -132,6 +136,30 @@ export default function Home() {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  }, []);
+
+  useEffect(() => {
+    const handleExtensionReady = () => setExtensionStatus("ready");
+    window.addEventListener(
+      "PUZZLE_DATE_EXTENSION_READY",
+      handleExtensionReady,
+    );
+    window.dispatchEvent(new CustomEvent("PUZZLE_DATE_EXTENSION_PING"));
+
+    // ponytail: allow document_idle content scripts a moment to announce themselves.
+    const readinessTimer = window.setTimeout(() => {
+      setExtensionStatus((status) =>
+        status === "checking" ? "missing" : status,
+      );
+    }, 800);
+
+    return () => {
+      window.clearTimeout(readinessTimer);
+      window.removeEventListener(
+        "PUZZLE_DATE_EXTENSION_READY",
+        handleExtensionReady,
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -238,6 +266,11 @@ export default function Home() {
   }, [goNext, goPrevious]);
 
   const reloadGame = () => {
+    if (extensionStatus !== "ready") {
+      setShowExtensionGuide(true);
+      return;
+    }
+
     window.dispatchEvent(
       new CustomEvent("RESET_ACTIVE_IFRAME", {
         detail: { keys: activePuzzle.resetStorageKeys ?? [] },
@@ -406,6 +439,38 @@ export default function Home() {
         </div>
       )}
 
+      {showExtensionGuide && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="add-game-modal extension-guide-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="extension-guide-title"
+          >
+            <button
+              className="modal-close"
+              type="button"
+              onClick={() => setShowExtensionGuide(false)}
+              aria-label="Close extension installation message"
+            >
+              ×
+            </button>
+            <p className="eyebrow">One-time setup</p>
+            <h2 id="extension-guide-title">Install Start Over</h2>
+            <p>
+              Chrome needs the Puzzle Date extension before it can reset games
+              from other websites.
+            </p>
+            <a
+              className="extension-guide-link"
+              href="/PuzzleDate/extension-install.html"
+            >
+              Open installation guide
+            </a>
+          </section>
+        </div>
+      )}
+
       <section className="frame-wrap" aria-label={`${activePuzzle.name} puzzle`}>
         {activePuzzle.canEmbed === false ? (
           <div className="external-game">
@@ -457,14 +522,16 @@ export default function Home() {
             <span aria-hidden="true"> / </span>
             {String(orderedPuzzles.length).padStart(2, "0")}
           </span>
-          <div className="steps" aria-hidden="true">
+          <div className="steps">
             {orderedPuzzles.map((puzzle, index) => (
               <button
                 key={puzzle.url}
                 type="button"
                 className={index === activeIndex ? "active" : ""}
                 onClick={() => goToPuzzle(index)}
-                tabIndex={-1}
+                aria-label={`Go to ${puzzle.name}`}
+                aria-current={index === activeIndex ? "step" : undefined}
+                data-game-name={puzzle.name}
               />
             ))}
           </div>

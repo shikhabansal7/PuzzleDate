@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Puzzle Date Game Reset",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Lets Puzzle Date reset selected storage keys in the active embedded game.",
   "permissions": ["activeTab", "scripting", "webNavigation"],
   "host_permissions": ["<all_urls>"],

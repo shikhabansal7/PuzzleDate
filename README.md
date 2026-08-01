@@ -92,6 +92,29 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm test`: build the starter and verify its rendered loading skeleton
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
+## Share the Chrome extension
+
+Puzzle Date's **Start Over** feature needs the companion Chrome extension to
+reset storage inside games hosted on other websites. Package a fresh copy from
+the checked-in `chrome-extension/` source with:
+
+```bash
+npm run package:extension
+```
+
+This writes `public/downloads/puzzle-date-game-reset.zip`. To install it:
+
+1. Download the ZIP and unzip it.
+2. Open `chrome://extensions` in Google Chrome.
+3. Turn on **Developer mode** in the top-right corner.
+4. Click **Load unpacked** and select the unzipped folder—the folder that
+   directly contains `manifest.json`.
+5. Refresh Puzzle Date if it was already open.
+
+Chrome does not automatically update a manually loaded extension. After a new
+ZIP is shared, unzip the replacement and use the extension card's **Reload**
+button (or remove it and load the new folder).
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)

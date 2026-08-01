@@ -12,6 +12,13 @@ const findActiveIframe = () => {
   });
 };
 
+const advertiseReadiness = () => {
+  window.dispatchEvent(new CustomEvent("PUZZLE_DATE_EXTENSION_READY"));
+};
+
+window.addEventListener("PUZZLE_DATE_EXTENSION_PING", advertiseReadiness);
+advertiseReadiness();
+
 window.addEventListener("RESET_ACTIVE_IFRAME", (event) => {
   const iframe = findActiveIframe();
   if (!iframe?.src) {
