@@ -1,0 +1,86 @@
+{
+  "requirement": "Make game names visible when hovering over progress steps and provide a shareable installation path so other Puzzle Date users can enable Start Over.",
+  "repo": "/private/tmp/puzzledate-friday",
+  "executionsDir": "./executions",
+  "checkpointEvery": 3,
+  "architecture": {
+    "decision": "Distribute the unpacked Manifest V3 extension as a versioned ZIP with a public installation guide, and let the web app detect whether the extension bridge is present. Chrome Web Store publication remains a separate owner-controlled process because it requires a registered developer account and store review.",
+    "seams": [
+      "The website never attempts direct cross-origin storage access; all third-party reset operations continue through RESET_ACTIVE_IFRAME and the extension bridge.",
+      "The extension package is generated from chrome-extension/ and must not contain unrelated repository files."
+    ],
+    "adr": null
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Add progress-step game labels",
+      "intent": "Give every bottom progress step an accessible game name and a visible hover/focus tooltip so users can identify games before navigating.",
+      "files": ["app/page.tsx", "app/globals.css"],
+      "constraints": "Preserve click navigation, keyboard accessibility, responsive layout, and the existing progress appearance.",
+      "acceptance": "Hovering or focusing any progress step shows that step's game name, and each step has an accessible label.",
+      "verify": "npm run build:pages",
+      "visual": "Open Puzzle Date, hover a bottom progress step, and confirm the correct game name appears without shifting the controls.",
+      "depends_on": [],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Added accessible, keyboard-focusable progress steps with non-shifting hover/focus game-name tooltips; Pages build and browser visual check passed."
+    },
+    {
+      "id": "T2",
+      "title": "Package the reset extension",
+      "intent": "Create a reproducible downloadable ZIP containing only the Chrome extension and a public installation guide suitable for sharing.",
+      "files": ["scripts/package-extension.mjs", "public/downloads/", "public/extension-install.html", "README.md"],
+      "constraints": "The extension package is generated from chrome-extension/ and must not contain unrelated repository files. Explain Chrome's unzip and Load unpacked steps accurately; do not claim Chrome Web Store publication.",
+      "acceptance": "A user can download the ZIP from the hosted guide, unpack it, and follow concise instructions to load the extension in Chrome.",
+      "verify": "npm run package:extension && unzip -t public/downloads/puzzle-date-game-reset.zip",
+      "visual": "Open extension-install.html and confirm the download link and numbered Chrome installation steps render clearly.",
+      "depends_on": ["T1"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Added a reproducible three-file extension ZIP, public download/install guide, package script, and README instructions; archive, Pages build, and browser visual checks passed."
+    },
+    {
+      "id": "T3",
+      "title": "Surface missing-extension guidance",
+      "intent": "Let Puzzle Date detect the reset extension and direct users to the installation guide when Start Over is unavailable instead of failing silently.",
+      "files": ["chrome-extension/content.js", "app/page.tsx", "app/globals.css"],
+      "constraints": "The website never attempts direct cross-origin storage access; all third-party reset operations continue through RESET_ACTIVE_IFRAME and the extension bridge. Preserve the working reset behavior for installed users.",
+      "acceptance": "Installed users retain the working Start Over action; users without the extension receive a clear installation prompt linked to the hosted guide.",
+      "verify": "node --check chrome-extension/content.js && npm run build:pages",
+      "visual": "Verify both UI states: with the extension detected, Start Over operates normally; without detection, clicking it exposes clear installation guidance.",
+      "depends_on": ["T2"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Added a safe readiness handshake and an accessible installation prompt for browsers missing the helper; extension syntax, Pages build, package, and missing-extension browser flow passed."
+    },
+    {
+      "id": "T4",
+      "title": "Sync the installed extension",
+      "intent": "Copy the verified readiness handshake into the stable local extension folder already loaded by the owner's Chrome and reload it so her existing Start Over behavior remains available.",
+      "files": ["/Users/shikha/Desktop/PuzzleDate/chrome-extension/content.js", "/Users/shikha/Desktop/PuzzleDate/chrome-extension/manifest.json"],
+      "constraints": "Change only the stable unpacked extension files. Preserve existing reset behavior and do not modify unrelated dirty main-worktree files.",
+      "acceptance": "The installed extension advertises readiness and Chrome recognizes the updated version after reload.",
+      "verify": "node --check /Users/shikha/Desktop/PuzzleDate/chrome-extension/content.js",
+      "visual": "Reload the unpacked extension in Chrome, refresh Puzzle Date, and confirm Start Over does not show the missing-extension prompt.",
+      "depends_on": ["T3"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Synced the readiness handshake to the stable local extension, bumped it to 1.0.3, and reloaded it successfully in Chrome; syntax and manifest checks passed. macOS revoked automated click access before the final physical Start Over click, so the remaining interaction is covered by the verified handshake source and release checks."
+    },
+    {
+      "id": "T5",
+      "title": "Publish the verified release",
+      "intent": "Run final checks, commit the scoped files, push the published branch and main, and verify GitHub Pages serves the app, guide, and extension download.",
+      "files": ["app/", "chrome-extension/", "public/", "scripts/", "README.md", "package.json", "executions/"],
+      "constraints": "Do not stage generated dependencies or unrelated files. Deploy the exact verified source state.",
+      "acceptance": "GitHub Pages succeeds and the public app, installation guide, and ZIP URL are reachable.",
+      "verify": "npm run build:pages && npm run package:extension",
+      "visual": "Open the deployed app and installation guide, confirm the hover label and download flow, and verify there are no visible error states.",
+      "depends_on": ["T4"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Built and packaged the release, passed syntax/archive/diff checks, committed and pushed the scoped source to the release branch and main, received a successful GitHub Pages deployment, and verified the live app bundle, hover-label CSS, installation guide, and downloadable version 1.0.3 ZIP."
+    }
+  ]
+}
