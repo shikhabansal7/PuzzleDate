@@ -517,6 +517,23 @@ export default function Home() {
         )}
 
         <div className="progress">
+          <div className="game-menu" aria-label="Choose a game">
+            <p className="game-menu-title">Jump to a game</p>
+            <div className="game-menu-list">
+              {orderedPuzzles.map((puzzle, index) => (
+                <button
+                  key={`menu-${puzzle.url}`}
+                  type="button"
+                  className={index === activeIndex ? "active" : ""}
+                  onClick={() => goToPuzzle(index)}
+                  aria-current={index === activeIndex ? "page" : undefined}
+                >
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  {puzzle.name}
+                </button>
+              ))}
+            </div>
+          </div>
           <span className="count">
             {String(activeIndex + 1).padStart(2, "0")}
             <span aria-hidden="true"> / </span>
@@ -531,7 +548,6 @@ export default function Home() {
                 onClick={() => goToPuzzle(index)}
                 aria-label={`Go to ${puzzle.name}`}
                 aria-current={index === activeIndex ? "step" : undefined}
-                data-game-name={puzzle.name}
               />
             ))}
           </div>
