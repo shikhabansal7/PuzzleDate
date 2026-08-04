@@ -1,0 +1,73 @@
+{
+  "requirement": "Use the Puzzle Date Chrome extension to embed every configured game while preserving a new-tab fallback when the extension is unavailable.",
+  "repo": "/private/tmp/puzzledate-preload",
+  "executionsDir": "./executions",
+  "checkpointEvery": 3,
+  "architecture": {
+    "decision": "Use a Manifest V3 declarativeNetRequest static ruleset to remove only iframe-blocking response headers from configured game subframes initiated by Puzzle Date. The React app embeds formerly blocked games only after the extension readiness handshake and otherwise preserves its new-tab fallback.",
+    "seams": [
+      "Header modification applies only to sub_frame requests initiated by Puzzle Date and never to top-level browsing.",
+      "The app must preserve the existing external-game fallback whenever the extension readiness handshake is not ready.",
+      "The reset bridge must continue selecting only the visible active iframe, never a hidden preloaded frame."
+    ],
+    "adr": null
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Add scoped iframe header rules",
+      "intent": "Extend the Chrome extension with a static Manifest V3 ruleset that removes iframe-blocking response headers for configured game domains only when they load as Puzzle Date subframes.",
+      "files": ["chrome-extension/manifest.json", "chrome-extension/rules.json"],
+      "constraints": "Header modification applies only to sub_frame requests initiated by Puzzle Date and never to top-level browsing. Preserve reset permissions and content-script behavior.",
+      "acceptance": "The manifest registers an enabled ruleset, the rules target all configured external game domains, and only X-Frame-Options/CSP blocking headers are removed from Puzzle Date subframes.",
+      "verify": "node -e \"JSON.parse(require('fs').readFileSync('chrome-extension/manifest.json')); JSON.parse(require('fs').readFileSync('chrome-extension/rules.json'))\"",
+      "visual": null,
+      "depends_on": [],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Added and independently validated a Manifest V3 static ruleset for 11 configured game domains, scoped to Puzzle Date subframes and three remove-only iframe-blocking headers; bumped the extension to 1.0.4."
+    },
+    {
+      "id": "T2",
+      "title": "Embed games when extension is ready",
+      "intent": "Change Puzzle Date so formerly external-only games render as iframes after the extension readiness handshake, while users without the extension retain the new-tab card and direct-open navigation.",
+      "files": ["app/page.tsx", "app/globals.css"],
+      "constraints": "The app must preserve the existing external-game fallback whenever the extension readiness handshake is not ready. The reset bridge must continue selecting only the visible active iframe, never a hidden preloaded frame.",
+      "acceptance": "Every configured game is embedded for extension-ready users; missing-extension users still receive the existing external fallback; next-game preloading continues to exclude hidden frames from reset targeting.",
+      "verify": "npm run build:pages",
+      "visual": "Test extension-ready and extension-missing states and confirm navigation, iframe visibility, fallback cards, and controls render correctly.",
+      "depends_on": ["T1"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Added extension-ready effective embeddability for active and preloaded games while preserving the external card and automatic new-tab navigation when the extension is checking or missing; production build passed."
+    },
+    {
+      "id": "T3",
+      "title": "Package the enhanced extension",
+      "intent": "Include the new ruleset in the downloadable extension ZIP, update installation guidance/versioning, and sync the verified files into the stable local extension folder.",
+      "files": ["scripts/package-extension.mjs", "scripts/validate-extension.mjs", "public/downloads/", "public/extension-install.html", "README.md", "/Users/shikha/Desktop/PuzzleDate/chrome-extension/"],
+      "constraints": "The package must contain only manifest.json, background.js, content.js, and rules.json. Do not modify unrelated dirty files in the main workspace.",
+      "acceptance": "The public ZIP contains the complete enhanced extension, the guide explains reloading/updating it, and the stable local unpacked copy matches the packaged version.",
+      "verify": "npm run package:extension && unzip -t public/downloads/puzzle-date-game-reset.zip",
+      "visual": "Open the installation guide and confirm its download/update instructions are clear.",
+      "depends_on": ["T2"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Added strict extension validation, reproducible four-file packaging, version 1.0.4 install/upgrade guidance, and byte-matched the stable local unpacked extension to the release sources; ZIP, build, hash, and comparison checks passed."
+    },
+    {
+      "id": "T4",
+      "title": "Validate and publish universal embedding",
+      "intent": "Run final extension/app checks, verify every configured game domain against the embedding rules and browser behavior, publish the scoped release, and confirm GitHub Pages serves the new app and extension package.",
+      "files": ["app/", "chrome-extension/", "public/", "scripts/", "README.md", "package.json", "executions/"],
+      "constraints": "Do not stage dependencies, generated build directories, or unrelated main-workspace files. Keep a working new-tab fallback for any site that still cannot render after header rules.",
+      "acceptance": "All configured games either render inside Puzzle Date with the enhanced extension or retain a verified automatic fallback; Pages and the extension download deploy successfully.",
+      "verify": "npm run build:pages && npm run package:extension && node scripts/validate-extension.mjs",
+      "visual": "Navigate the complete rotation in a browser with the updated extension and confirm each iframe or fallback state, controls, and reset targeting.",
+      "depends_on": ["T3"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Passed final build/validator/package/domain checks; real Chrome 1.0.4 testing embedded every game available today, repaired and visually confirmed Word Salad canvas preloading, verified Full Circle's Saturday-only domain preflight, published to branch/main, and confirmed successful Pages deployment, live Connections embedding, guide, and ZIP."
+    }
+  ]
+}
