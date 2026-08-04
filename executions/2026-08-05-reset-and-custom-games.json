@@ -66,8 +66,8 @@
       "visual": "Test built-in and custom game flows with the reloaded release extension, then verify the deployed app and installation guide.",
       "depends_on": ["T3"],
       "parallel_group": null,
-      "status": "in_progress",
-      "result": ""
+      "status": "done",
+      "result": "Released extension 1.0.6 after real Chrome verification of custom hostname registration, automatic iframe embedding, custom-origin localStorage clearing, Poople reset/modal behavior, and Verticle reset. Published commit b2cdfd2 to main; GitHub Pages serves the matching 1.0.6 ZIP (SHA-256 ef52d02ce60141edf17b07c6bd89db778ca9c2c72149e3ec2857626fe87531c8)."
     }
   ]
 }
