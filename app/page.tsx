@@ -8,11 +8,19 @@ type Puzzle = {
   url: string;
   color: string;
   canEmbed?: boolean;
-  canReset?: boolean;
-  resetStorageKeys?: string[];
+  resetStrategy?: ResetStrategy;
   saturdayOnly?: boolean;
   custom?: boolean;
 };
+
+type ResetStrategy =
+  | "word500-current"
+  | "foximax-daily"
+  | "verticle-current"
+  | "four-by-three-current"
+  | "full-circle-current"
+  | "poople-current"
+  | "custom-clear-all";
 
 const puzzles: Puzzle[] = [
   {
@@ -27,8 +35,7 @@ const puzzles: Puzzle[] = [
     publisher: "Daily word challenge",
     url: "https://word500.com/game?mode=daily",
     color: "#f3c96b",
-    canReset: true,
-    resetStorageKeys: [],
+    resetStrategy: "word500-current",
   },
   {
     name: "FoxiMax",
@@ -36,14 +43,14 @@ const puzzles: Puzzle[] = [
     url: "https://foximax.com/",
     color: "#f39c81",
     canEmbed: false,
+    resetStrategy: "foximax-daily",
   },
   {
     name: "Verticle",
     publisher: "Daily word ladder",
     url: "https://verticle.netlify.app/",
     color: "#9cc8a7",
-    canReset: true,
-    resetStorageKeys: ["gameofthedaystate", "gamestate"],
+    resetStrategy: "verticle-current",
   },
   {
     name: "Waffle",
@@ -57,7 +64,6 @@ const puzzles: Puzzle[] = [
     publisher: "Daily reverse Wordle",
     url: "https://unwordle.org/?daily=1",
     color: "#88b8dc",
-    canReset: false,
   },
   {
     name: "4 × 3",
@@ -65,6 +71,7 @@ const puzzles: Puzzle[] = [
     url: "https://www.hankgreen.com/fourbythree/",
     color: "#e893bd",
     canEmbed: false,
+    resetStrategy: "four-by-three-current",
   },
   {
     name: "Chain It",
@@ -84,14 +91,14 @@ const puzzles: Puzzle[] = [
     url: "https://fullcirclefriday.com/fullcircle.html",
     color: "#f08b62",
     saturdayOnly: true,
+    resetStrategy: "full-circle-current",
   },
   {
     name: "Poople",
     publisher: "Daily guessing game",
     url: "https://poople.io/",
     color: "#d5a47a",
-    canReset: true,
-    resetStorageKeys: ["guesses"],
+    resetStrategy: "poople-current",
   },
 ];
 
@@ -99,6 +106,33 @@ const puzzlesForDay = (day: number) =>
   puzzles.filter((puzzle) => !puzzle.saturdayOnly || day === 6);
 
 const defaultPuzzles = puzzlesForDay(-1);
+const MAX_CUSTOM_GAMES = 100;
+
+const customHost = (puzzle: Puzzle) => {
+  try {
+    return new URL(puzzle.url).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+const normalizeCustomHosts = (value: unknown) => {
+  if (!Array.isArray(value) || value.length > MAX_CUSTOM_GAMES) return null;
+  const hostnames: string[] = [];
+  for (const part of value) {
+    if (typeof part !== "string" || part !== part.toLowerCase()) return null;
+    try {
+      const parsed = new URL(`https://${part}`);
+      if (parsed.hostname !== part || parsed.host !== part || parsed.pathname !== "/") {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+    hostnames.push(part);
+  }
+  return [...new Set(hostnames)].sort();
+};
 
 const shuffle = (items: Puzzle[]) => {
   const shuffled = [...items];
@@ -126,16 +160,24 @@ export default function Home() {
     "checking" | "ready" | "missing"
   >("checking");
   const [showExtensionGuide, setShowExtensionGuide] = useState(false);
+  const [registeredCustomHosts, setRegisteredCustomHosts] = useState<Set<string>>(
+    new Set(),
+  );
+  const [customFrameRevision, setCustomFrameRevision] = useState(0);
+  const pendingCustomHostsRef = useRef<string[]>([]);
   const activePuzzle = orderedPuzzles[activeIndex];
   const nextPuzzle = orderedPuzzles[activeIndex + 1];
   const extensionReady = extensionStatus === "ready";
-  const activePuzzleCanEmbed =
-    activePuzzle.canEmbed !== false || extensionReady;
+  const canFramePuzzle = (puzzle: Puzzle) =>
+    puzzle.custom
+      ? extensionReady && registeredCustomHosts.has(customHost(puzzle))
+      : puzzle.canEmbed !== false || extensionReady;
+  const activePuzzleCanEmbed = canFramePuzzle(activePuzzle);
   const framedPuzzles = [
     ...(activePuzzleCanEmbed
       ? [{ puzzle: activePuzzle, isActive: true }]
       : []),
-    ...(nextPuzzle && (nextPuzzle.canEmbed !== false || extensionReady)
+    ...(nextPuzzle && canFramePuzzle(nextPuzzle)
       ? [{ puzzle: nextPuzzle, isActive: false }]
       : []),
   ];
@@ -175,6 +217,47 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const handleRegistrationResult = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (!detail?.ok) {
+        console.error("Puzzle Date custom-game registration failed:", detail?.error);
+        return;
+      }
+      const hostnames = normalizeCustomHosts(detail?.hostnames);
+      if (
+        !hostnames ||
+        JSON.stringify(hostnames) !== JSON.stringify(pendingCustomHostsRef.current)
+      ) return;
+      setRegisteredCustomHosts(new Set(hostnames));
+      setCustomFrameRevision((revision) => revision + 1);
+    };
+    window.addEventListener(
+      "PUZZLE_DATE_CUSTOM_GAMES_RESULT",
+      handleRegistrationResult,
+    );
+    return () =>
+      window.removeEventListener(
+        "PUZZLE_DATE_CUSTOM_GAMES_RESULT",
+        handleRegistrationResult,
+      );
+  }, []);
+
+  useEffect(() => {
+    if (!extensionReady) {
+      setRegisteredCustomHosts(new Set());
+      return;
+    }
+    const hostnames = normalizeCustomHosts(customPuzzles.map(customHost).filter(Boolean));
+    if (!hostnames) return;
+    pendingCustomHostsRef.current = hostnames;
+    window.dispatchEvent(
+      new CustomEvent("PUZZLE_DATE_REGISTER_CUSTOM_GAMES", {
+        detail: { hostnames },
+      }),
+    );
+  }, [customPuzzles, extensionReady]);
+
+  useEffect(() => {
     let savedCustomPuzzles: Puzzle[] = [];
     const customGames = window.localStorage.getItem("puzzle-date-custom-games");
 
@@ -185,16 +268,22 @@ export default function Home() {
           url: string;
         }>;
 
-        savedCustomPuzzles = savedGames.flatMap(({ name, url }) => {
+        savedCustomPuzzles = savedGames.slice(0, MAX_CUSTOM_GAMES).flatMap(({ name, url }) => {
           try {
+            if (typeof name !== "string" || typeof url !== "string") return [];
             const parsedUrl = new URL(url);
-            if (!["http:", "https:"].includes(parsedUrl.protocol)) return [];
+            if (
+              !["http:", "https:"].includes(parsedUrl.protocol) ||
+              !parsedUrl.hostname
+            ) return [];
             return [{
               name,
               publisher: "Your added game",
               url: parsedUrl.href,
               color: "#72b6a7",
               custom: true,
+              canEmbed: false,
+              resetStrategy: "custom-clear-all",
             }];
           } catch {
             return [];
@@ -289,7 +378,7 @@ export default function Home() {
 
     window.dispatchEvent(
       new CustomEvent("RESET_ACTIVE_IFRAME", {
-        detail: { keys: activePuzzle.resetStorageKeys ?? [] },
+        detail: { strategy: activePuzzle.resetStrategy },
       }),
     );
   };
@@ -320,6 +409,10 @@ export default function Home() {
         setAddGameError("That game is already in your rotation.");
         return;
       }
+      if (!parsedUrl.hostname || customPuzzles.length >= MAX_CUSTOM_GAMES) {
+        setAddGameError("Puzzle Date supports up to 100 added game links.");
+        return;
+      }
 
       const domainName = parsedUrl.hostname
         .replace(/^www\./, "")
@@ -332,6 +425,8 @@ export default function Home() {
         url: parsedUrl.href,
         color: "#72b6a7",
         custom: true,
+        canEmbed: false,
+        resetStrategy: "custom-clear-all",
       };
       const nextCustomPuzzles = [...customPuzzles, newPuzzle];
       const nextOrder = [...orderedPuzzles, newPuzzle];
@@ -339,6 +434,7 @@ export default function Home() {
       setCustomPuzzles(nextCustomPuzzles);
       setOrderedPuzzles(nextOrder);
       setActiveIndex(nextOrder.length - 1);
+      if (!extensionReady) openInNewTab(newPuzzle);
       window.localStorage.setItem(
         "puzzle-date-custom-games",
         JSON.stringify(
@@ -386,7 +482,7 @@ export default function Home() {
           <button className="utility-button" type="button" onClick={shuffleRest}>
             Shuffle rest
           </button>
-          {activePuzzle.canEmbed !== false && activePuzzle.canReset === true && (
+          {activePuzzle.resetStrategy && canFramePuzzle(activePuzzle) && (
             <button
               className="utility-button"
               type="button"
@@ -508,7 +604,7 @@ export default function Home() {
         )}
         {framedPuzzles.map(({ puzzle, isActive }) => (
           <iframe
-            key={puzzle.url}
+            key={`${puzzle.url}:${puzzle.custom ? customFrameRevision : 0}`}
             className={isActive ? "game-frame active" : "game-frame preloaded"}
             src={puzzle.url}
             title={isActive ? puzzle.name : `${puzzle.name} (preloaded)`}
@@ -518,6 +614,7 @@ export default function Home() {
             referrerPolicy="strict-origin-when-cross-origin"
             allow="fullscreen; clipboard-read; clipboard-write; storage-access"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-presentation"
+            data-custom-game={puzzle.custom ? "true" : undefined}
             onPointerLeave={
               isActive ? () => appShellRef.current?.focus() : undefined
             }

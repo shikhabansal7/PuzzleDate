@@ -1,0 +1,73 @@
+{
+  "requirement": "Make Start Over work safely for as many built-in games as possible, and automatically embed/reset games added through the plus button, then publish a fresh shareable extension.",
+  "repo": "/private/tmp/puzzledate-preload",
+  "executionsDir": "./executions",
+  "checkpointEvery": 3,
+  "architecture": {
+    "decision": "Represent resets as explicit reload-only, selected-key, or clear-all strategies. Built-in games use the narrowest verified strategy; user-added games use clear-all for their own origin. Register custom hostnames with one tightly scoped dynamic declarativeNetRequest rule limited to Puzzle Date subframes.",
+    "seams": [
+      "Built-in resets must preserve tutorials and lifetime statistics whenever a verified selected-key or reload-only strategy is available.",
+      "Custom-domain iframe rules must remain limited to user-added hostnames, Puzzle Date/localhost initiators, sub_frame resources, and the three approved framing headers.",
+      "Reset execution must target only the visible active iframe and never a hidden preloaded frame."
+    ],
+    "adr": null
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Audit built-in reset strategies",
+      "intent": "Inspect public game source assets and existing behavior to identify the narrowest reliable Start Over strategy for each built-in game without reading browser storage or changing live game progress.",
+      "files": ["executions/2026-08-05-reset-strategy-audit.md"],
+      "constraints": "Do not inspect browser cookies or local/session storage. Use public source/assets and existing user-provided key evidence. Distinguish verified keys from reload-only or unsafe unknowns.",
+      "acceptance": "Every built-in game has a documented strategy recommendation, evidence, and preservation risk; unsupported cases are explicitly identified.",
+      "verify": "test -s executions/2026-08-05-reset-strategy-audit.md",
+      "visual": null,
+      "depends_on": [],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Audited all 11 built-ins from public assets and user evidence; verified narrow resets for Word 500, FoxiMax, Verticle, 4×3, Full Circle Friday, and Poople, and documented five unsafe/unsupported games."
+    },
+    {
+      "id": "T2",
+      "title": "Implement reset strategy protocol",
+      "intent": "Add an explicit app-to-extension reset protocol and enable Start Over for every built-in game whose audited strategy is safe and reliable.",
+      "files": ["app/page.tsx", "chrome-extension/content.js", "chrome-extension/background.js"],
+      "constraints": "Built-in resets must preserve tutorials and lifetime statistics whenever a verified selected-key or reload-only strategy is available. Reset execution must target only the visible active iframe and never a hidden preloaded frame.",
+      "acceptance": "The app sends a typed reset strategy; the extension validates it; safe built-in games expose Start Over and execute the intended reload/key removal/clear behavior without broadening reset scope.",
+      "verify": "npm run build:pages && node --check chrome-extension/background.js && node --check chrome-extension/content.js",
+      "visual": "Use real Chrome to verify representative reload-only, selected-key, and clear-all reset paths and confirm hidden preload frames are not targeted.",
+      "depends_on": ["T1"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Replaced loose key transport with double-validated strategy IDs and implemented exact narrow resets for six audited built-ins, including origin binding, transactional Verticle updates, and preserved Poople modal handling; build and syntax checks passed."
+    },
+    {
+      "id": "T3",
+      "title": "Register custom games automatically",
+      "intent": "Make every valid plus-button game request extension-backed embedding for its hostname and receive a generic clear-all Start Over action, including games restored from Puzzle Date storage.",
+      "files": ["app/page.tsx", "chrome-extension/content.js", "chrome-extension/background.js", "chrome-extension/manifest.json", "scripts/validate-extension.mjs"],
+      "constraints": "Custom-domain iframe rules must remain limited to user-added hostnames, Puzzle Date/localhost initiators, sub_frame resources, and the three approved framing headers. Validate protocols and hostnames at both app and extension boundaries.",
+      "acceptance": "Adding or restoring a custom HTTPS/HTTP game registers only its hostname, embeds it with the extension, shows Start Over, and clears only that iframe origin's local storage before reloading.",
+      "verify": "npm run validate:extension && npm run build:pages",
+      "visual": "Add a controlled test game in Chrome, verify it embeds, confirm Start Over is present, and verify invalid/non-web URLs remain rejected.",
+      "depends_on": ["T2"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Implemented acknowledged custom-host registration with one tightly scoped dynamic DNR rule, custom iframe fallback/rekeying, and hostname-bound localStorage-only Start Over for new/restored plus-button games; build, syntax, validator, and diff checks passed."
+    },
+    {
+      "id": "T4",
+      "title": "Package test and publish extension",
+      "intent": "Bump, sync, reproducibly package, and test the enhanced extension and app, publish both release branches, and verify the live app, guide, and fresh extension link.",
+      "files": ["chrome-extension/", "scripts/", "public/", "README.md", "package.json", "executions/", "/Users/shikha/Desktop/PuzzleDate/chrome-extension/"],
+      "constraints": "Do not stage dependencies, build directories, or unrelated main-workspace changes. Deploy only the exact Chrome-tested source state.",
+      "acceptance": "Real Chrome tests pass, the stable local extension and public ZIP match the bumped release, GitHub Pages succeeds, and the downloadable link serves the new version.",
+      "verify": "npm run validate:extension && npm run package:extension && npm run build:pages && unzip -t public/downloads/puzzle-date-game-reset.zip",
+      "visual": "Test built-in and custom game flows with the reloaded release extension, then verify the deployed app and installation guide.",
+      "depends_on": ["T3"],
+      "parallel_group": null,
+      "status": "in_progress",
+      "result": ""
+    }
+  ]
+}

@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.4") fail("release version must be 1.0.4");
+if (manifest.version !== "1.0.6") fail("release version must be 1.0.6");
 if (!manifest.permissions?.includes("declarativeNetRequest")) {
   fail("declarativeNetRequest permission is required");
 }
@@ -67,6 +67,40 @@ const configuredDomains = [...puzzleList.matchAll(/url: "(https:[^"]+)"/g)]
   .map(([, url]) => new URL(url).hostname.replace(/^www\./, ""));
 if (!equalSet(rule.condition?.requestDomains ?? [], configuredDomains)) {
   fail("requestDomains must exactly cover all configured game domains");
+}
+
+const backgroundSource = await readFile(path.join(extensionDirectory, "background.js"), "utf8");
+const contentSource = await readFile(path.join(extensionDirectory, "content.js"), "utf8");
+for (const required of [
+  "CUSTOM_GAMES_RULE_ID = 1000",
+  "MAX_CUSTOM_HOSTS = 100",
+  "updateDynamicRules",
+  "removeRuleIds: [CUSTOM_GAMES_RULE_ID]",
+  'initiatorDomains: [...PUZZLE_DATE_HOSTS]',
+  'resourceTypes: ["sub_frame"]',
+  'message.strategy === "custom-clear-all"',
+  "localStorage.clear()",
+  "getDynamicRules",
+]) {
+  if (!backgroundSource.includes(required)) fail(`background is missing ${required}`);
+}
+if (/sessionStorage\.clear|indexedDB|cookies|caches\.delete/.test(backgroundSource)) {
+  fail("custom reset may only clear localStorage");
+}
+for (const required of [
+  "PUZZLE_DATE_REGISTER_CUSTOM_GAMES",
+  "PUZZLE_DATE_CUSTOM_GAMES_RESULT",
+  'iframe.dataset.customGame !== "true"',
+  'strategy === "custom-clear-all"',
+]) {
+  if (!contentSource.includes(required)) fail(`content script is missing ${required}`);
+}
+for (const required of [
+  'resetStrategy: "custom-clear-all"',
+  'data-custom-game={puzzle.custom ? "true" : undefined}',
+  "setCustomFrameRevision",
+]) {
+  if (!pageSource.includes(required)) fail(`app is missing ${required}`);
 }
 
 for (const file of ["background.js", "content.js"]) {

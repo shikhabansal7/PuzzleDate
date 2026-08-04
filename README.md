@@ -94,10 +94,23 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 
 ## Share the Chrome extension
 
-Puzzle Date's companion Chrome extension embeds the complete game rotation and
-lets **Start Over** reset storage inside supported games hosted on other
-websites. Validate and package a fresh copy from the checked-in
-`chrome-extension/` source with:
+Puzzle Date's companion Chrome extension embeds the complete built-in game
+rotation. Version 1.0.6 also registers the hostname of each game added through
+the plus button so that game can embed inside Puzzle Date.
+
+For built-in games, **Start Over** is offered only where Puzzle Date has a
+narrow reset for the current puzzle: Word 500, FoxiMax, Verticle, 4 × 3, Full
+Circle Friday, and Poople. These resets target the game's current-puzzle state
+instead of clearing all storage for the site.
+
+For a game added through the plus button, **Start Over deletes all
+`localStorage` for that added game's origin** and reloads it. This is
+intentionally destructive and may erase that site's statistics, tutorial
+completion, settings, and other saved progress. It does not clear cookies,
+session storage, IndexedDB, or caches.
+
+Validate and package a fresh copy from the checked-in `chrome-extension/`
+source with:
 
 ```bash
 npm run validate:extension
@@ -114,15 +127,19 @@ This writes `public/downloads/puzzle-date-game-reset.zip`. To install it:
 5. Refresh Puzzle Date if it was already open.
 
 Chrome does not automatically replace a manually loaded extension. To upgrade
-an existing installation to version 1.0.4, download and unzip the replacement,
-remove the old **Puzzle Date Game Reset** card from `chrome://extensions`, load
-the new unpacked folder, and refresh Puzzle Date. Confirm that the extension
-card shows version 1.0.4.
+an existing installation to version 1.0.6:
+
+1. Download the new ZIP and unzip it to a new folder.
+2. Open `chrome://extensions`.
+3. Remove the old **Puzzle Date Game Reset** card.
+4. Click **Load unpacked** and select the new folder that directly contains
+   `manifest.json`.
+5. Refresh Puzzle Date and confirm the extension card shows version 1.0.6.
 
 The framing rules are limited to iframe requests initiated by Puzzle Date (or
-localhost during development), to the configured game domains, and to removing
-the three headers that otherwise prevent embedding. Normal top-level visits are
-not modified.
+localhost during development), to the configured built-in domains and custom
+hostnames registered from the plus button, and to removing the three headers
+that otherwise prevent embedding. Normal top-level visits are not modified.
 
 ## Learn More
 
