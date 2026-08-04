@@ -284,6 +284,7 @@ h1 {
 }
 
 .frame-wrap {
+  position: relative;
   min-height: 0;
   overflow: hidden;
   background: #fff;
@@ -346,7 +347,10 @@ iframe {
 }
 
 .game-frame.preloaded {
-  display: none;
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .controls {

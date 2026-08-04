@@ -128,11 +128,14 @@ export default function Home() {
   const [showExtensionGuide, setShowExtensionGuide] = useState(false);
   const activePuzzle = orderedPuzzles[activeIndex];
   const nextPuzzle = orderedPuzzles[activeIndex + 1];
+  const extensionReady = extensionStatus === "ready";
+  const activePuzzleCanEmbed =
+    activePuzzle.canEmbed !== false || extensionReady;
   const framedPuzzles = [
-    ...(activePuzzle.canEmbed !== false
+    ...(activePuzzleCanEmbed
       ? [{ puzzle: activePuzzle, isActive: true }]
       : []),
-    ...(nextPuzzle && nextPuzzle.canEmbed !== false
+    ...(nextPuzzle && (nextPuzzle.canEmbed !== false || extensionReady)
       ? [{ puzzle: nextPuzzle, isActive: false }]
       : []),
   ];
@@ -242,11 +245,15 @@ export default function Home() {
       const nextPuzzle = orderedPuzzles[nextIndex];
 
       setActiveIndex(nextIndex);
-      if (openExternal && nextPuzzle.canEmbed === false) {
+      if (
+        openExternal &&
+        nextPuzzle.canEmbed === false &&
+        extensionStatus !== "ready"
+      ) {
         openInNewTab(nextPuzzle);
       }
     },
-    [openInNewTab, orderedPuzzles],
+    [extensionStatus, openInNewTab, orderedPuzzles],
   );
 
   const goPrevious = useCallback(() => {
@@ -481,7 +488,7 @@ export default function Home() {
       )}
 
       <section className="frame-wrap" aria-label={`${activePuzzle.name} puzzle`}>
-        {activePuzzle.canEmbed === false && (
+        {!activePuzzleCanEmbed && (
           <div className="external-game">
             <span
               className="external-dot"

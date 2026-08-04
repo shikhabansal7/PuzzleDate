@@ -103,10 +103,10 @@
   <body>
     <main>
       <p class="eyebrow">Puzzle Date companion</p>
-      <h1>Make “Start Over” work</h1>
+      <h1>Play every game inside Puzzle Date</h1>
       <p class="intro">
-        Install this small Chrome extension so Puzzle Date can reset supported
-        games embedded from other websites.
+        Install this small Chrome extension to embed the full game rotation in
+        Puzzle Date and make “Start Over” work for supported games.
       </p>
       <a class="download" href="downloads/puzzle-date-game-reset.zip" download>
         Download the Chrome extension
@@ -124,9 +124,22 @@
         <li>Refresh Puzzle Date if it was already open.</li>
       </ol>
 
+      <h2>Update an existing installation</h2>
+      <ol>
+        <li>Download and unzip the new <strong>version 1.0.4</strong> folder.</li>
+        <li>Open <code>chrome://extensions</code>.</li>
+        <li>
+          On the Puzzle Date Game Reset card, click <strong>Remove</strong>, then
+          choose <strong>Load unpacked</strong> and select the new folder that
+          directly contains <code>manifest.json</code>.
+        </li>
+        <li>Refresh Puzzle Date. The extension card should show version 1.0.4.</li>
+      </ol>
+
       <p class="note">
-        Keep the unzipped folder on your computer after installation. Chrome
-        needs it to keep the manually loaded extension available.
+        Keep the selected folder on your computer. This extension removes only
+        iframe-blocking response headers for Puzzle Date’s listed game domains;
+        it does not change those sites when you visit them in a normal tab.
       </p>
     </main>
   </body>

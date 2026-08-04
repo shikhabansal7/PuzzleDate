@@ -94,11 +94,13 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 
 ## Share the Chrome extension
 
-Puzzle Date's **Start Over** feature needs the companion Chrome extension to
-reset storage inside games hosted on other websites. Package a fresh copy from
-the checked-in `chrome-extension/` source with:
+Puzzle Date's companion Chrome extension embeds the complete game rotation and
+lets **Start Over** reset storage inside supported games hosted on other
+websites. Validate and package a fresh copy from the checked-in
+`chrome-extension/` source with:
 
 ```bash
+npm run validate:extension
 npm run package:extension
 ```
 
@@ -111,9 +113,16 @@ This writes `public/downloads/puzzle-date-game-reset.zip`. To install it:
    directly contains `manifest.json`.
 5. Refresh Puzzle Date if it was already open.
 
-Chrome does not automatically update a manually loaded extension. After a new
-ZIP is shared, unzip the replacement and use the extension card's **Reload**
-button (or remove it and load the new folder).
+Chrome does not automatically replace a manually loaded extension. To upgrade
+an existing installation to version 1.0.4, download and unzip the replacement,
+remove the old **Puzzle Date Game Reset** card from `chrome://extensions`, load
+the new unpacked folder, and refresh Puzzle Date. Confirm that the extension
+card shows version 1.0.4.
+
+The framing rules are limited to iframe requests initiated by Puzzle Date (or
+localhost during development), to the configured game domains, and to removing
+the three headers that otherwise prevent embedding. Normal top-level visits are
+not modified.
 
 ## Learn More
 

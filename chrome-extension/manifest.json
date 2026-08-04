@@ -1,12 +1,26 @@
 {
   "manifest_version": 3,
   "name": "Puzzle Date Game Reset",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Lets Puzzle Date reset selected storage keys in the active embedded game.",
-  "permissions": ["activeTab", "scripting", "webNavigation"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "webNavigation",
+    "declarativeNetRequest"
+  ],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "puzzle_date_game_frames",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
   },
   "content_scripts": [
     {
