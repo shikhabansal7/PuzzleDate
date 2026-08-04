@@ -176,6 +176,35 @@ h1 {
   background: #193d2b;
 }
 
+.extension-help-button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--green);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 11px;
+  white-space: nowrap;
+}
+
+.extension-help-button > span:first-child {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.extension-help-button:hover,
+.extension-help-button:focus-visible {
+  border-color: var(--green);
+  background: #edf3ed;
+  outline: none;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -210,7 +239,7 @@ h1 {
   font-size: 13px;
 }
 
-.extension-guide-link {
+.extension-download-link {
   display: inline-block;
   border-radius: 10px;
   background: var(--green);
@@ -221,9 +250,63 @@ h1 {
   text-decoration: none;
 }
 
-.extension-guide-link:hover,
-.extension-guide-link:focus-visible {
+.extension-download-link:hover,
+.extension-download-link:focus-visible {
   background: #193d2b;
+}
+
+.extension-guide-modal {
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100dvh - 40px));
+  overflow-y: auto;
+}
+
+.extension-guide-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.extension-guide-steps section {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
+}
+
+.extension-guide-steps h3 {
+  margin: 0 0 8px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.extension-guide-steps ol {
+  margin: 0;
+  padding-left: 18px;
+  color: #5f625b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.extension-guide-steps li + li {
+  margin-top: 5px;
+}
+
+.extension-guide-steps code {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+
+.extension-reset-warning {
+  margin: 14px 0 0 !important;
+  border-radius: 10px;
+  background: #f5e9df;
+  color: #71452d !important;
+  font-size: 11px !important;
+  line-height: 1.5;
+  padding: 11px 12px;
 }
 
 .modal-close {
@@ -574,12 +657,34 @@ iframe {
   }
 
   .header-actions {
-    gap: 9px;
+    gap: 7px;
   }
 
   .utility-button {
     padding: 7px 8px;
     font-size: 8px;
+  }
+
+  .extension-help-button {
+    width: 34px;
+    padding: 0;
+  }
+
+  .extension-help-label {
+    display: none;
+  }
+
+  .extension-guide-modal {
+    padding: 24px 20px;
+  }
+
+  .extension-guide-modal h2 {
+    padding-right: 24px;
+    font-size: 25px;
+  }
+
+  .extension-guide-steps {
+    grid-template-columns: 1fr;
   }
 
   .open-link span {

@@ -1,0 +1,31 @@
+{
+  "requirement": "Add an extension download/help control beside the plus icon that opens complete installation instructions inside Puzzle Date.",
+  "repo": "/private/tmp/puzzledate-preload",
+  "executionsDir": "./executions",
+  "checkpointEvery": 3,
+  "architecture": {
+    "decision": "Reuse the existing modal and extension guide state; replace the external-guide-only content with a self-contained in-app download and instruction flow.",
+    "seams": [
+      "The control must sit immediately beside the plus button.",
+      "The popup must contain the versioned extension download plus Chrome install and update steps.",
+      "Keep keyboard labels, modal semantics, and responsive header behavior accessible."
+    ],
+    "adr": null
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Add in-app extension download popup",
+      "intent": "Expose a help/download button beside Add a game and make its modal fully self-contained.",
+      "files": ["app/page.tsx", "app/globals.css"],
+      "constraints": "Reuse existing modal patterns; do not alter game rotation, reset, or extension protocols; preserve responsive and accessible behavior.",
+      "acceptance": "A uniquely labeled control beside the plus icon opens a modal with the 1.0.6 ZIP download, Chrome installation/update steps, close control, and reset warning without navigating away.",
+      "verify": "npm run build:pages && git diff --check",
+      "visual": "Open the live-size app locally, verify the button placement and modal at desktop and mobile widths.",
+      "depends_on": [],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Added an accessible Extension control immediately beside Add a game and a responsive, self-contained modal with the direct 1.0.6 ZIP download, install/update instructions, and custom-reset warning; production build, diff check, and live Chrome interaction passed."
+    }
+  ]
+}

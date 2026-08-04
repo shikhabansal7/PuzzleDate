@@ -492,6 +492,16 @@ export default function Home() {
             </button>
           )}
           <button
+            className="extension-help-button"
+            type="button"
+            onClick={() => setShowExtensionGuide(true)}
+            aria-label="Download or install the Puzzle Date extension"
+            title="Extension download and instructions"
+          >
+            <span aria-hidden="true">↓</span>
+            <span className="extension-help-label">Extension</span>
+          </button>
+          <button
             className="add-game-button"
             type="button"
             onClick={() => {
@@ -567,18 +577,49 @@ export default function Home() {
             >
               ×
             </button>
-            <p className="eyebrow">One-time setup</p>
-            <h2 id="extension-guide-title">Install Start Over</h2>
+            <p className="eyebrow">Chrome extension · Version 1.0.6</p>
+            <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
             <p>
-              Chrome needs the Puzzle Date extension before it can reset games
-              from other websites.
+              Install the extension once to embed supported games and let Puzzle
+              Date reset them from inside the app.
             </p>
             <a
-              className="extension-guide-link"
-              href="/PuzzleDate/extension-install.html"
+              className="extension-download-link"
+              href="/PuzzleDate/downloads/puzzle-date-game-reset.zip"
+              download
             >
-              Open installation guide
+              Download extension 1.0.6
             </a>
+            <div className="extension-guide-steps">
+              <section aria-labelledby="new-install-title">
+                <h3 id="new-install-title">Install in Chrome</h3>
+                <ol>
+                  <li>Download the ZIP above, then unzip it.</li>
+                  <li>
+                    Open <code>chrome://extensions</code> and turn on Developer
+                    mode.
+                  </li>
+                  <li>
+                    Choose <strong>Load unpacked</strong> and select the unzipped
+                    folder.
+                  </li>
+                  <li>Refresh Puzzle Date.</li>
+                </ol>
+              </section>
+              <section aria-labelledby="update-install-title">
+                <h3 id="update-install-title">Already installed?</h3>
+                <ol>
+                  <li>Remove the old Puzzle Date extension in Chrome.</li>
+                  <li>Download and unzip version 1.0.6.</li>
+                  <li>Load the new folder, then refresh Puzzle Date.</li>
+                </ol>
+              </section>
+            </div>
+            <p className="extension-reset-warning">
+              <strong>Custom-game warning:</strong> Start Over clears all local
+              storage for that added game’s website. This can erase its stats,
+              tutorial state, settings, and saved progress.
+            </p>
           </section>
         </div>
       )}
