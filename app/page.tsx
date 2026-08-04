@@ -127,6 +127,15 @@ export default function Home() {
   >("checking");
   const [showExtensionGuide, setShowExtensionGuide] = useState(false);
   const activePuzzle = orderedPuzzles[activeIndex];
+  const nextPuzzle = orderedPuzzles[activeIndex + 1];
+  const framedPuzzles = [
+    ...(activePuzzle.canEmbed !== false
+      ? [{ puzzle: activePuzzle, isActive: true }]
+      : []),
+    ...(nextPuzzle && nextPuzzle.canEmbed !== false
+      ? [{ puzzle: nextPuzzle, isActive: false }]
+      : []),
+  ];
 
   const openInNewTab = useCallback((puzzle: Puzzle) => {
     const link = document.createElement("a");
@@ -472,7 +481,7 @@ export default function Home() {
       )}
 
       <section className="frame-wrap" aria-label={`${activePuzzle.name} puzzle`}>
-        {activePuzzle.canEmbed === false ? (
+        {activePuzzle.canEmbed === false && (
           <div className="external-game">
             <span
               className="external-dot"
@@ -489,17 +498,24 @@ export default function Home() {
               Open {activePuzzle.name} <span aria-hidden="true">↗</span>
             </a>
           </div>
-        ) : (
+        )}
+        {framedPuzzles.map(({ puzzle, isActive }) => (
           <iframe
-            key={activePuzzle.url}
-            src={activePuzzle.url}
-            title={activePuzzle.name}
+            key={puzzle.url}
+            className={isActive ? "game-frame active" : "game-frame preloaded"}
+            src={puzzle.url}
+            title={isActive ? puzzle.name : `${puzzle.name} (preloaded)`}
+            aria-hidden={isActive ? undefined : true}
+            tabIndex={isActive ? undefined : -1}
+            loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
             allow="fullscreen; clipboard-read; clipboard-write; storage-access"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-presentation"
-            onPointerLeave={() => appShellRef.current?.focus()}
+            onPointerLeave={
+              isActive ? () => appShellRef.current?.focus() : undefined
+            }
           />
-        )}
+        ))}
       </section>
 
       <nav
