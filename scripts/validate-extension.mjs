@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.10") fail("release version must be 1.0.10");
+if (manifest.version !== "1.0.11") fail("release version must be 1.0.11");
 if (!manifest.permissions?.includes("declarativeNetRequest")) {
   fail("declarativeNetRequest permission is required");
 }
@@ -85,6 +85,12 @@ const connectionsReset = backgroundSource.match(
 if (!connectionsReset) fail("Connections reset implementation is missing");
 if (!connectionsReset.includes('localStorage.removeItem("games-state-connections/ANON")')) {
   fail("Connections reset must remove only the anonymous current-game key");
+}
+if (!connectionsReset.includes("return { ok: true, reloadFromParent: true }")) {
+  fail("Connections reset must ask the Puzzle Date parent to reload its iframe");
+}
+if (connectionsReset.includes("window.location.reload")) {
+  fail("Connections reset must not reload from inside the child frame");
 }
 if (/localStorage\.(?:clear|setItem)\(|removeItem\((?!"games-state-connections\/ANON")/.test(connectionsReset)) {
   fail("Connections reset must not broadly clear or modify New York Times storage");
@@ -201,6 +207,8 @@ for (const required of [
   'iframe.dataset.customGame !== "true"',
   'strategy === "custom-clear-all"',
   'type: "ENABLE_PUZZLE_DATE_AD_BLOCK"',
+  "response?.ok && response.reloadFromParent",
+  "iframe.src = currentSrc",
 ]) {
   if (!contentSource.includes(required)) fail(`content script is missing ${required}`);
 }
@@ -208,7 +216,7 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.10"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.11"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',

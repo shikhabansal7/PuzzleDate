@@ -293,6 +293,7 @@ const resetCurrentPuzzle = (strategy) => {
 
   if (strategy === "connections-current") {
     localStorage.removeItem("games-state-connections/ANON");
+    return { ok: true, reloadFromParent: true };
   } else if (strategy === "word500-current") {
     const language = localStorage.getItem("word500lang");
     const level = localStorage.getItem("word500level");

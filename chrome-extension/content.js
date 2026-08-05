@@ -120,6 +120,10 @@ window.addEventListener("RESET_ACTIVE_IFRAME", (event) => {
     { type: "RESET_ACTIVE_IFRAME", frameUrl: iframe.src, strategy, hostname },
     (response) => {
       const error = chrome.runtime.lastError?.message;
+      if (!error && response?.ok && response.reloadFromParent) {
+        const currentSrc = iframe.src;
+        iframe.src = currentSrc;
+      }
       window.dispatchEvent(
         new CustomEvent("RESET_ACTIVE_IFRAME_RESULT", {
           detail: error
