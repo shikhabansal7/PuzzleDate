@@ -44,8 +44,8 @@
       "title": "Automatically reopen the Connections board",
       "files": ["chrome-extension/background.js", "chrome-extension/manifest.json", "app/page.tsx", "scripts/validate-extension.mjs", "README.md", "public/extension-install.html", "public/downloads/puzzle-date-game-reset.zip"],
       "acceptance": "After a successful Connections reset and parent reload, the extension performs one bounded, Connections-only click on the verified data-testid moment-btn-play control, so the board appears without leaving the user on NYT's Play screen; version 1.0.13 is packaged and deployed.",
-      "status": "in_progress",
-      "result": ""
+      "status": "done",
+      "result": "Fixed in 1.0.13: after a successful explicit Connections reset, a one-shot tab/frame-scoped pending action waits up to 10 seconds on the exact Connections URL and clicks only [data-testid=moment-btn-play] with exact text Play. The marker, observer, and timer are cleaned up. Automated checks pass, Pages serves index-t48KuX0a.js, and the public ZIP hash-matches the tested archive (ab5f7466e97e89d503ada7348f31f66c22dbbbf2a21134cf857de44ef6a16397)."
     }
   ]
 }
