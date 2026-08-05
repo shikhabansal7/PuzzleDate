@@ -1,4 +1,5 @@
 const RESET_STRATEGY_ORIGINS = {
+  "connections-current": "https://www.nytimes.com",
   "word500-current": "https://word500.com",
   "foximax-daily": "https://foximax.com",
   "verticle-current": "https://verticle.netlify.app",
@@ -278,6 +279,7 @@ const clearCustomGame = () => {
 
 const resetCurrentPuzzle = (strategy) => {
   const allowedStrategies = new Set([
+    "connections-current",
     "word500-current",
     "foximax-daily",
     "verticle-current",
@@ -289,7 +291,9 @@ const resetCurrentPuzzle = (strategy) => {
     return { ok: false, error: "Unsupported reset strategy." };
   }
 
-  if (strategy === "word500-current") {
+  if (strategy === "connections-current") {
+    localStorage.removeItem("games-state-connections/ANON");
+  } else if (strategy === "word500-current") {
     const language = localStorage.getItem("word500lang");
     const level = localStorage.getItem("word500level");
     const isSanePart = (value) =>

@@ -1,0 +1,27 @@
+{
+  "requirement": "Add a Start Over button for NYT Connections without deleting statistics or preferences.",
+  "repo": "/private/tmp/puzzledate-adblock",
+  "architecture": {
+    "decision": "Add a dedicated connections-current reset strategy that removes only the verified anonymous daily-state key games-state-connections/ANON and reloads the embedded frame.",
+    "evidence": "The current public NYT Connections bundle builds daily state keys as games-state-<game>/<user or ANON>; Connections uses game=connections. Settings and stats are separate.",
+    "safety": "Do not clear all nytimes.com storage, settings, display preferences, or statistics."
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Implement Connections Start Over and package 1.0.10",
+      "files": ["app/page.tsx", "chrome-extension/content.js", "chrome-extension/background.js", "chrome-extension/manifest.json", "scripts/validate-extension.mjs", "README.md", "public/extension-install.html", "public/downloads/puzzle-date-game-reset.zip"],
+      "acceptance": "Connections shows Start Over when embedded; clicking it removes only games-state-connections/ANON and reloads the frame; version/status/download references are 1.0.10; automated validation and packaging pass.",
+      "status": "done",
+      "result": "Connections now uses connections-current; the extension removes only games-state-connections/ANON and reloads, while preserving every other NYT key. Version 1.0.10, release copy, validator, and ZIP are updated. Validation, Pages build, ZIP integrity/source equality, JS syntax, and diff checks pass."
+    },
+    {
+      "id": "T2",
+      "title": "Verify and publish",
+      "files": ["/Users/shikha/Desktop/PuzzleDate/chrome-extension/", "GitHub Pages"],
+      "acceptance": "The stable unpacked folder and public ZIP match tested 1.0.10; Pages serves the new app; the checkpoint branch and main are pushed.",
+      "status": "in_progress",
+      "result": ""
+    }
+  ]
+}

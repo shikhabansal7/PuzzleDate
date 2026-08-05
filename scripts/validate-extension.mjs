@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.9") fail("release version must be 1.0.9");
+if (manifest.version !== "1.0.10") fail("release version must be 1.0.10");
 if (!manifest.permissions?.includes("declarativeNetRequest")) {
   fail("declarativeNetRequest permission is required");
 }
@@ -71,6 +71,24 @@ if (!equalSet(rule.condition?.requestDomains ?? [], configuredDomains)) {
 
 const backgroundSource = await readFile(path.join(extensionDirectory, "background.js"), "utf8");
 const contentSource = await readFile(path.join(extensionDirectory, "content.js"), "utf8");
+for (const [sourceName, source] of [["content", contentSource], ["background", backgroundSource]]) {
+  if (!source.includes('"connections-current"')) {
+    fail(`${sourceName} is missing the Connections reset strategy`);
+  }
+}
+if (!backgroundSource.includes('"connections-current": "https://www.nytimes.com"')) {
+  fail("Connections reset must be restricted to the New York Times origin");
+}
+const connectionsReset = backgroundSource.match(
+  /if \(strategy === "connections-current"\) \{([\s\S]*?)\n  \} else if/,
+)?.[1];
+if (!connectionsReset) fail("Connections reset implementation is missing");
+if (!connectionsReset.includes('localStorage.removeItem("games-state-connections/ANON")')) {
+  fail("Connections reset must remove only the anonymous current-game key");
+}
+if (/localStorage\.(?:clear|setItem)\(|removeItem\((?!"games-state-connections\/ANON")/.test(connectionsReset)) {
+  fail("Connections reset must not broadly clear or modify New York Times storage");
+}
 const readStringArray = (source, constantName) => {
   const body = source.match(new RegExp(`const ${constantName} = \\[([\\s\\S]*?)\\n\\];`))?.[1];
   if (!body) fail(`background is missing ${constantName}`);
@@ -190,7 +208,8 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.9"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.10"',
+  'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
   'extension-health-light--${extensionHealth}',

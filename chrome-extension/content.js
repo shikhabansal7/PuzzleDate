@@ -20,6 +20,7 @@ const advertiseReadiness = () => {
 };
 
 const RESET_STRATEGIES = new Set([
+  "connections-current",
   "word500-current",
   "foximax-daily",
   "verticle-current",
