@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.8") fail("release version must be 1.0.8");
+if (manifest.version !== "1.0.9") fail("release version must be 1.0.9");
 if (!manifest.permissions?.includes("declarativeNetRequest")) {
   fail("declarativeNetRequest permission is required");
 }
@@ -78,6 +78,7 @@ const readStringArray = (source, constantName) => {
 };
 const expectedAdDomains = [
   "2mdn.net",
+  "adthrive.com",
   "adnxs.com",
   "adsrvr.org",
   "amazon-adsystem.com",
@@ -86,11 +87,13 @@ const expectedAdDomains = [
   "doubleclick.net",
   "googleadservices.com",
   "googlesyndication.com",
+  "npttech.com",
   "openx.net",
   "outbrain.com",
   "pubmatic.com",
   "rubiconproject.com",
   "taboola.com",
+  "videoplayerhub.com",
 ];
 if (!equalSet(readStringArray(backgroundSource, "AD_SERVING_DOMAINS"), expectedAdDomains)) {
   fail("ad blocking must use exactly the reviewed ad-serving domains");
@@ -107,9 +110,13 @@ if (!equalSet(readStringArray(backgroundSource, "AD_BLOCK_RESOURCE_TYPES"), [
 for (const selector of [
   '.pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-top"]',
   '.pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-bottom"]',
+  '[class*="adthrive" i]',
+  '[id*="adthrive" i]',
+  '[data-adthrive]',
+  'iframe[src*="videoplayerhub.com"]',
 ]) {
   if (!backgroundSource.includes(selector)) {
-    fail(`cosmetic ad blocking is missing the NYT Connections selector ${selector}`);
+    fail(`cosmetic ad blocking is missing the reviewed selector ${selector}`);
   }
 }
 for (const required of [
@@ -168,6 +175,9 @@ if (/document\.querySelectorAll\(\s*['"]button/i.test(backgroundSource)) {
   fail("consent controls must be searched only inside known containers");
 }
 for (const required of [
+  'chrome.runtime.getManifest().version',
+  'PUZZLE_DATE_EXTENSION_READY',
+  'detail: { version }',
   "PUZZLE_DATE_REGISTER_CUSTOM_GAMES",
   "PUZZLE_DATE_CUSTOM_GAMES_RESULT",
   'iframe.dataset.customGame !== "true"',
@@ -180,6 +190,11 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
+  'const EXPECTED_EXTENSION_VERSION = "1.0.9"',
+  'extensionHealth === "current"',
+  'extensionHealth === "outdated"',
+  'extension-health-light--${extensionHealth}',
+  'className="visually-hidden"',
   'resetStrategy: "custom-clear-all"',
   'data-custom-game={puzzle.custom ? "true" : undefined}',
   "setCustomFrameRevision",

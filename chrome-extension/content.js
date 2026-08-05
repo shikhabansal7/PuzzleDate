@@ -13,7 +13,10 @@ const findActiveIframe = () => {
 };
 
 const advertiseReadiness = () => {
-  window.dispatchEvent(new CustomEvent("PUZZLE_DATE_EXTENSION_READY"));
+  const version = chrome.runtime.getManifest().version;
+  window.dispatchEvent(new CustomEvent("PUZZLE_DATE_EXTENSION_READY", {
+    detail: { version },
+  }));
 };
 
 const RESET_STRATEGIES = new Set([

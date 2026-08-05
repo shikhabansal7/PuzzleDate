@@ -1,0 +1,45 @@
+{
+  "requirement": "Show red/yellow/green extension health beside the Extension button and remove the remaining Word 500 ads.",
+  "repo": "/private/tmp/puzzledate-adblock",
+  "executionsDir": "./executions",
+  "checkpointEvery": 3,
+  "architecture": {
+    "decision": "Include the installed manifest version in the existing readiness event and compare it to one app-side current-version constant; extend the existing tab-scoped ad blocker with Word 500's verified Raptive/video ad domains and cosmetic markers.",
+    "seams": [
+      "Red means no readiness response, yellow means readiness without the exact current version, and green means the exact current extension version.",
+      "Older extensions that send no version must remain compatible and display yellow rather than green.",
+      "Word 500 blocking remains limited to Puzzle Date-enabled tabs and must not alter gameplay, progress, or ordinary browsing."
+    ],
+    "adr": null
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Add extension health indicator",
+      "intent": "Expose installed extension version through readiness and render accessible red/yellow/green health beside the Extension button.",
+      "files": ["chrome-extension/content.js", "app/page.tsx", "app/globals.css", "scripts/validate-extension.mjs"],
+      "constraints": "Use one expected-version constant; treat missing version as outdated; preserve the current readiness timeout and popup behavior; provide accessible status text and non-color cues.",
+      "acceptance": "Missing extension is red, an older/no-version extension is yellow, and exact version 1.0.9 is green; the status is visible beside the Extension control on desktop and mobile and announced accessibly.",
+      "verify": "npm run build:pages && npm run validate:extension && node --check chrome-extension/content.js && git diff --check",
+      "visual": "Use Chrome to verify red without the extension response, yellow with 1.0.8, and green after 1.0.9 reload.",
+      "depends_on": [],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Readiness now reports the installed manifest version; the app safely maps no response to red, an older/unknown version to yellow, and exact 1.0.9 to green with tooltip, aria-label, and live accessible text. Build, validator, syntax, and whitespace checks pass."
+    },
+    {
+      "id": "T2",
+      "title": "Block Word 500 ads and release 1.0.9",
+      "intent": "Block the verified Word 500 ad sources and containers, package and publish the next extension.",
+      "files": ["chrome-extension/background.js", "chrome-extension/manifest.json", "app/page.tsx", "README.md", "public/extension-install.html", "public/downloads/puzzle-date-game-reset.zip", "scripts/validate-extension.mjs", "/Users/shikha/Desktop/PuzzleDate/chrome-extension/"],
+      "constraints": "Add only verified Raptive/npttech/videoplayerhub roots and narrow Raptive cosmetic selectors; retain all prior blocker/consent/reset behavior; sync only verified files.",
+      "acceptance": "Word 500 has no loaded or visible Raptive/video ads inside Puzzle Date, gameplay and Start Over still work, version 1.0.9 is packaged, and the live in-app download matches the Chrome-tested ZIP.",
+      "verify": "npm run validate:extension && npm run package:extension && npm run build:pages && unzip -t public/downloads/puzzle-date-game-reset.zip",
+      "visual": "Reload 1.0.9 in Chrome, verify Word 500 ad-free plus health dot green, then regress Connections/Waffle and Start Over.",
+      "depends_on": ["T1"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Extension 1.0.9 blocks Word 500's verified AdThrive, npttech, and videoplayerhub roots plus narrow injected AdThrive/video containers. Google Tag Manager was deliberately excluded during review to avoid unnecessary breakage. Release copy and ZIP were updated; validator, packaging, Pages build, ZIP integrity, JS syntax, and diff checks pass."
+    }
+  ]
+}

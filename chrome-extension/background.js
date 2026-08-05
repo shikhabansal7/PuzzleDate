@@ -17,6 +17,7 @@ const CUSTOM_FRAME_HEADERS = [
 ];
 const AD_SERVING_DOMAINS = [
   "2mdn.net",
+  "adthrive.com",
   "adnxs.com",
   "adsrvr.org",
   "amazon-adsystem.com",
@@ -25,11 +26,13 @@ const AD_SERVING_DOMAINS = [
   "doubleclick.net",
   "googleadservices.com",
   "googlesyndication.com",
+  "npttech.com",
   "openx.net",
   "outbrain.com",
   "pubmatic.com",
   "rubiconproject.com",
   "taboola.com",
+  "videoplayerhub.com",
 ];
 const AD_BLOCK_RESOURCE_TYPES = [
   "image",
@@ -47,10 +50,14 @@ const AD_BLOCK_COSMETIC_CSS = `
   .ad-wrapper,
   .advertisement,
   .advertising,
+  [class*="adthrive" i],
+  [id*="adthrive" i],
+  [data-adthrive],
   .pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-top"],
   .pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-bottom"],
   iframe[src*="doubleclick.net"],
-  iframe[src*="googlesyndication.com"] {
+  iframe[src*="googlesyndication.com"],
+  iframe[src*="videoplayerhub.com"] {
     display: none !important;
     visibility: hidden !important;
   }

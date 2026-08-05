@@ -22,6 +22,13 @@ type ResetStrategy =
   | "poople-current"
   | "custom-clear-all";
 
+const EXPECTED_EXTENSION_VERSION = "1.0.9";
+
+const validExtensionVersion = (value: unknown) =>
+  typeof value === "string" && /^\d+\.\d+\.\d+$/.test(value)
+    ? value
+    : null;
+
 const puzzles: Puzzle[] = [
   {
     name: "Connections",
@@ -159,6 +166,7 @@ export default function Home() {
   const [extensionStatus, setExtensionStatus] = useState<
     "checking" | "ready" | "missing"
   >("checking");
+  const [extensionVersion, setExtensionVersion] = useState<string | null>(null);
   const [showExtensionGuide, setShowExtensionGuide] = useState(false);
   const [registeredCustomHosts, setRegisteredCustomHosts] = useState<Set<string>>(
     new Set(),
@@ -168,6 +176,19 @@ export default function Home() {
   const activePuzzle = orderedPuzzles[activeIndex];
   const nextPuzzle = orderedPuzzles[activeIndex + 1];
   const extensionReady = extensionStatus === "ready";
+  const extensionHealth = !extensionReady
+    ? "missing"
+    : extensionVersion === EXPECTED_EXTENSION_VERSION
+      ? "current"
+      : "outdated";
+  const extensionHealthText =
+    extensionHealth === "current"
+      ? `Extension ${EXPECTED_EXTENSION_VERSION} is installed and up to date`
+      : extensionHealth === "outdated"
+        ? extensionVersion
+          ? `Extension ${extensionVersion} is installed but version ${EXPECTED_EXTENSION_VERSION} is available`
+          : `Extension is installed but its version could not be verified; version ${EXPECTED_EXTENSION_VERSION} is available`
+        : "Extension is not installed or is not responding";
   const canFramePuzzle = (puzzle: Puzzle) =>
     puzzle.custom
       ? extensionReady && registeredCustomHosts.has(customHost(puzzle))
@@ -193,7 +214,15 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const handleExtensionReady = () => setExtensionStatus("ready");
+    const handleExtensionReady = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      const version =
+        detail && typeof detail === "object" && "version" in detail
+          ? validExtensionVersion((detail as { version?: unknown }).version)
+          : null;
+      setExtensionVersion(version);
+      setExtensionStatus("ready");
+    };
     window.addEventListener(
       "PUZZLE_DATE_EXTENSION_READY",
       handleExtensionReady,
@@ -495,11 +524,18 @@ export default function Home() {
             className="extension-help-button"
             type="button"
             onClick={() => setShowExtensionGuide(true)}
-            aria-label="Download or install the Puzzle Date extension"
-            title="Extension download and instructions"
+            aria-label={`${extensionHealthText}. Open extension download and instructions`}
+            title={extensionHealthText}
           >
             <span aria-hidden="true">↓</span>
             <span className="extension-help-label">Extension</span>
+            <span
+              className={`extension-health-light extension-health-light--${extensionHealth}`}
+              aria-hidden="true"
+            />
+            <span className="visually-hidden" aria-live="polite">
+              {extensionHealthText}
+            </span>
           </button>
           <button
             className="add-game-button"
@@ -577,15 +613,16 @@ export default function Home() {
             >
               ×
             </button>
-            <p className="eyebrow">Chrome extension · Version 1.0.8</p>
+            <p className="eyebrow">Chrome extension · Version 1.0.9</p>
             <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
             <p>
               Install the extension once to embed supported games and let Puzzle
               Date reset them from inside the app.
             </p>
             <p>
-              Version 1.0.8 also blocks common ads and trackers while games are
-              embedded inside Puzzle Date. In recognized cookie-consent dialogs,
+              Version 1.0.9 also blocks common ads and trackers—including Word
+              500&apos;s verified ad services—while games are embedded inside Puzzle
+              Date. In recognized cookie-consent dialogs,
               it rejects or declines optional cookies, or limits consent to
               necessary cookies. If no privacy-preserving choice exists, it
               dismisses or hides the recognized banner. This is best-effort, not
@@ -597,7 +634,7 @@ export default function Home() {
               href="/PuzzleDate/downloads/puzzle-date-game-reset.zip"
               download
             >
-              Download extension 1.0.8
+              Download extension 1.0.9
             </a>
             <div className="extension-guide-steps">
               <section aria-labelledby="new-install-title">
@@ -619,11 +656,15 @@ export default function Home() {
                 <h3 id="update-install-title">Already installed?</h3>
                 <ol>
                   <li>Remove the old Puzzle Date extension in Chrome.</li>
-                  <li>Download and unzip version 1.0.8.</li>
+                  <li>Download and unzip version 1.0.9.</li>
                   <li>Load the new folder, then refresh Puzzle Date.</li>
                 </ol>
               </section>
             </div>
+            <p>
+              The light beside Extension is red when it is missing, yellow when
+              an update is available, and green when version 1.0.9 is ready.
+            </p>
             <p className="extension-reset-warning">
               <strong>Custom-game warning:</strong> Start Over clears all local
               storage for that added game’s website. This can erase its stats,

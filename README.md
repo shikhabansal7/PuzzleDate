@@ -95,11 +95,12 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 ## Share the Chrome extension
 
 Puzzle Date's companion Chrome extension embeds the complete built-in game
-rotation. Version 1.0.8 also registers the hostname of each game added through
+rotation. Version 1.0.9 also registers the hostname of each game added through
 the plus button so that game can embed inside Puzzle Date.
 
-Version 1.0.8 blocks common ads and trackers only while games are embedded
-inside Puzzle Date. In recognized cookie-consent dialogs there, it automatically
+Version 1.0.9 blocks common ads and trackers, including Word 500's verified
+Raptive and video-ad services, only while games are embedded inside Puzzle Date.
+In recognized cookie-consent dialogs there, it automatically
 rejects or declines optional cookies, or limits consent to necessary cookies. If
 no privacy-preserving choice exists, it dismisses or hides the recognized
 banner. This cleanup is best-effort, not universal, and never chooses “Accept
@@ -134,14 +135,17 @@ This writes `public/downloads/puzzle-date-game-reset.zip`. To install it:
 5. Refresh Puzzle Date if it was already open.
 
 Chrome does not automatically replace a manually loaded extension. To upgrade
-an existing installation to version 1.0.8:
+an existing installation to version 1.0.9:
 
 1. Download the new ZIP and unzip it to a new folder.
 2. Open `chrome://extensions`.
 3. Remove the old **Puzzle Date Game Reset** card.
 4. Click **Load unpacked** and select the new folder that directly contains
    `manifest.json`.
-5. Refresh Puzzle Date and confirm the extension card shows version 1.0.8.
+5. Refresh Puzzle Date and confirm the extension card shows version 1.0.9.
+
+The light beside Puzzle Date's **Extension** button is red when the extension is
+missing, yellow when it needs an update, and green when version 1.0.9 is ready.
 
 The framing rules are limited to iframe requests initiated by Puzzle Date (or
 localhost during development), to the configured built-in domains and custom
