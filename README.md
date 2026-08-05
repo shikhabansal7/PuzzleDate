@@ -95,10 +95,10 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 ## Share the Chrome extension
 
 Puzzle Date's companion Chrome extension embeds the complete built-in game
-rotation. Version 1.0.11 also registers the hostname of each game added through
+rotation. Version 1.0.12 also registers the hostname of each game added through
 the plus button so that game can embed inside Puzzle Date.
 
-Version 1.0.11 blocks common ads and trackers, including Word 500's verified
+Version 1.0.12 blocks common ads and trackers, including Word 500's verified
 Raptive and video-ad services, only while games are embedded inside Puzzle Date.
 In recognized cookie-consent dialogs there, it automatically
 rejects or declines optional cookies, or limits consent to necessary cookies. If
@@ -110,6 +110,9 @@ For built-in games, **Start Over** is offered only where Puzzle Date has a
 narrow reset for the current puzzle: Connections, Word 500, FoxiMax, Verticle, 4 × 3, Full
 Circle Friday, and Poople. These resets target the game's current-puzzle state
 instead of clearing all storage for the site.
+For Connections, it keeps the saved puzzle envelope, archive mode, statistics,
+and settings while resetting only guesses, solved categories, mistakes, and the
+current puzzle's completion flags.
 
 For a game added through the plus button, **Start Over deletes all
 `localStorage` for that added game's origin** and reloads it. This is
@@ -135,17 +138,17 @@ This writes `public/downloads/puzzle-date-game-reset.zip`. To install it:
 5. Refresh Puzzle Date if it was already open.
 
 Chrome does not automatically replace a manually loaded extension. To upgrade
-an existing installation to version 1.0.11:
+an existing installation to version 1.0.12:
 
 1. Download the new ZIP and unzip it to a new folder.
 2. Open `chrome://extensions`.
 3. Remove the old **Puzzle Date Game Reset** card.
 4. Click **Load unpacked** and select the new folder that directly contains
    `manifest.json`.
-5. Refresh Puzzle Date and confirm the extension card shows version 1.0.11.
+5. Refresh Puzzle Date and confirm the extension card shows version 1.0.12.
 
 The light beside Puzzle Date's **Extension** button is red when the extension is
-missing, yellow when it needs an update, and green when version 1.0.11 is ready.
+missing, yellow when it needs an update, and green when version 1.0.12 is ready.
 
 The framing rules are limited to iframe requests initiated by Puzzle Date (or
 localhost during development), to the configured built-in domains and custom

@@ -30,6 +30,14 @@
       "acceptance": "Connections reset clears the verified state key without a child-frame reload, then content.js reloads the same iframe URL from the Puzzle Date parent after success; version 1.0.11 is packaged and deployed.",
       "status": "done",
       "result": "Fixed in 1.0.11: Connections clears its one verified daily-state key and returns reloadFromParent without reloading itself; content.js then reassigns the iframe URL from Puzzle Date. Automated checks pass, Pages serves index-D5g1gC_N.js, and the public ZIP hash-matches the tested archive (35bc2693e2c29f8e59e4231e8f54d3e2d64b6777c70d3b21237c95a04eb4fbf8)."
+    },
+    {
+      "id": "T4",
+      "title": "Preserve Connections started state",
+      "files": ["chrome-extension/background.js", "chrome-extension/manifest.json", "app/page.tsx", "scripts/validate-extension.mjs", "README.md", "public/extension-install.html", "public/downloads/puzzle-date-game-reset.zip"],
+      "acceptance": "Connections Start Over retains the existing daily puzzle record and resets only puzzleComplete, puzzleWon, mistakes, guesses, and solvedCategories inside its data, so the board reopens without the Play screen; malformed state fails safely; version 1.0.12 is packaged and deployed.",
+      "status": "in_progress",
+      "result": ""
     }
   ]
 }

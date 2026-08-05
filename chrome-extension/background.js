@@ -292,7 +292,45 @@ const resetCurrentPuzzle = (strategy) => {
   }
 
   if (strategy === "connections-current") {
-    localStorage.removeItem("games-state-connections/ANON");
+    const key = "games-state-connections/ANON";
+    const storedValue = localStorage.getItem(key);
+    if (storedValue === null) {
+      return { ok: false, error: "Connections game state is missing." };
+    }
+    let state;
+    try {
+      state = JSON.parse(storedValue);
+    } catch {
+      return { ok: false, error: "Connections game state is malformed." };
+    }
+    if (!state || typeof state !== "object" || Array.isArray(state) || !Array.isArray(state.states)) {
+      return { ok: false, error: "Connections game state is malformed." };
+    }
+    const resetStates = [];
+    for (const savedState of state.states) {
+      if (
+        !savedState ||
+        typeof savedState !== "object" ||
+        Array.isArray(savedState) ||
+        !savedState.data ||
+        typeof savedState.data !== "object" ||
+        Array.isArray(savedState.data)
+      ) {
+        return { ok: false, error: "Connections game state is malformed." };
+      }
+      resetStates.push({
+        ...savedState,
+        data: {
+          ...savedState.data,
+          puzzleComplete: false,
+          puzzleWon: false,
+          mistakes: 0,
+          guesses: [],
+          solvedCategories: [],
+        },
+      });
+    }
+    localStorage.setItem(key, JSON.stringify({ ...state, states: resetStates }));
     return { ok: true, reloadFromParent: true };
   } else if (strategy === "word500-current") {
     const language = localStorage.getItem("word500lang");
