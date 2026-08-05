@@ -36,8 +36,8 @@
       "title": "Preserve Connections started state",
       "files": ["chrome-extension/background.js", "chrome-extension/manifest.json", "app/page.tsx", "scripts/validate-extension.mjs", "README.md", "public/extension-install.html", "public/downloads/puzzle-date-game-reset.zip"],
       "acceptance": "Connections Start Over retains the existing daily puzzle record and resets only puzzleComplete, puzzleWon, mistakes, guesses, and solvedCategories inside its data, so the board reopens without the Play screen; malformed state fails safely; version 1.0.12 is packaged and deployed.",
-      "status": "in_progress",
-      "result": ""
+      "status": "done",
+      "result": "Fixed in 1.0.12: the existing games-state-connections/ANON record and all envelope/other data fields are preserved; only puzzleComplete, puzzleWon, mistakes, guesses, and solvedCategories are reset. Malformed/missing state is left untouched. Automated checks pass, Pages serves index-DEhnIEHN.js, and the public ZIP hash-matches the tested archive (23fa6c71330229a37a7d6fc1af425b673b4f1a71a3f0310eccc6404f55881a82)."
     }
   ]
 }
