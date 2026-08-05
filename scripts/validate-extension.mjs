@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.7") fail("release version must be 1.0.7");
+if (manifest.version !== "1.0.8") fail("release version must be 1.0.8");
 if (!manifest.permissions?.includes("declarativeNetRequest")) {
   fail("declarativeNetRequest permission is required");
 }
@@ -136,8 +136,36 @@ for (const required of [
 ]) {
   if (!backgroundSource.includes(required)) fail(`background is missing ${required}`);
 }
-if (/sessionStorage\.clear|indexedDB|cookies|caches\.delete|cookie|consent/i.test(backgroundSource)) {
-  fail("extension must not manipulate cookies, consent, or non-localStorage storage");
+for (const required of [
+  "handleConsentUi",
+  "containerSelectors",
+  "privacyLabels",
+  '"reject all"',
+  '"decline all"',
+  '"necessary only"',
+  '"essential only"',
+  '"continue without accepting"',
+  '"do not consent"',
+  "container.querySelectorAll",
+  "container.querySelector(closeSelectors.join",
+  "new MutationObserver",
+  "observer.disconnect()",
+  "12000",
+  "chrome.scripting.executeScript",
+  'world: "MAIN"',
+]) {
+  if (!backgroundSource.includes(required)) {
+    fail(`consent cleanup is missing ${required}`);
+  }
+}
+if (/sessionStorage\.(?:clear|removeItem|setItem)|indexedDB|chrome\.cookies|document\.cookie|caches\.(?:delete|open)/i.test(backgroundSource)) {
+  fail("extension must not manipulate cookies or non-localStorage storage");
+}
+if (/\b(?:accept all|allow all|agree|i accept|i agree)\b/i.test(backgroundSource)) {
+  fail("consent cleanup must not include acceptance labels or actions");
+}
+if (/document\.querySelectorAll\(\s*['"]button/i.test(backgroundSource)) {
+  fail("consent controls must be searched only inside known containers");
 }
 for (const required of [
   "PUZZLE_DATE_REGISTER_CUSTOM_GAMES",

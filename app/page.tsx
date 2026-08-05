@@ -577,23 +577,27 @@ export default function Home() {
             >
               ×
             </button>
-            <p className="eyebrow">Chrome extension · Version 1.0.7</p>
+            <p className="eyebrow">Chrome extension · Version 1.0.8</p>
             <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
             <p>
               Install the extension once to embed supported games and let Puzzle
               Date reset them from inside the app.
             </p>
             <p>
-              Version 1.0.7 also blocks common ads and trackers while games are
-              embedded inside Puzzle Date. It does not block ads during ordinary
-              browsing or accept or dismiss cookie consent messages.
+              Version 1.0.8 also blocks common ads and trackers while games are
+              embedded inside Puzzle Date. In recognized cookie-consent dialogs,
+              it rejects or declines optional cookies, or limits consent to
+              necessary cookies. If no privacy-preserving choice exists, it
+              dismisses or hides the recognized banner. This is best-effort, not
+              universal, and never chooses “Accept all.” Ordinary browsing is
+              unaffected.
             </p>
             <a
               className="extension-download-link"
               href="/PuzzleDate/downloads/puzzle-date-game-reset.zip"
               download
             >
-              Download extension 1.0.7
+              Download extension 1.0.8
             </a>
             <div className="extension-guide-steps">
               <section aria-labelledby="new-install-title">
@@ -615,7 +619,7 @@ export default function Home() {
                 <h3 id="update-install-title">Already installed?</h3>
                 <ol>
                   <li>Remove the old Puzzle Date extension in Chrome.</li>
-                  <li>Download and unzip version 1.0.7.</li>
+                  <li>Download and unzip version 1.0.8.</li>
                   <li>Load the new folder, then refresh Puzzle Date.</li>
                 </ol>
               </section>

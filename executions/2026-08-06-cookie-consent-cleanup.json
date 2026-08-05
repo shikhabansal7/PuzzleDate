@@ -1,0 +1,45 @@
+{
+  "requirement": "Remove cookie-consent interruptions from games embedded in Puzzle Date.",
+  "repo": "/private/tmp/puzzledate-adblock",
+  "executionsDir": "./executions",
+  "checkpointEvery": 3,
+  "architecture": {
+    "decision": "Extend the existing Puzzle Date child-frame cleanup with a bounded main-world consent handler that chooses reject/decline/necessary-only actions inside known consent containers, then cosmetically hides remaining known CMP overlays.",
+    "seams": [
+      "Run only in child frames of tabs already enabled by the trusted Puzzle Date content script.",
+      "Never click accept/allow/agree actions and never write or clear cookies or browser storage directly.",
+      "Use exact privacy-preserving action text and known consent-container selectors to avoid clicking unrelated game controls."
+    ],
+    "adr": null
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Implement privacy-preserving consent cleanup",
+      "intent": "Reject, dismiss, or hide cookie-consent UI inside Puzzle Date game frames without accepting tracking.",
+      "files": ["chrome-extension/background.js", "scripts/validate-extension.mjs"],
+      "constraints": "Scope to ad-block-enabled Puzzle Date child frames; match only known consent containers and exact reject/necessary-only labels; never accept consent or manipulate cookies/storage.",
+      "acceptance": "Known consent dialogs automatically choose a reject/decline/necessary-only control when present; otherwise known overlays are hidden; late-rendered dialogs are handled for a bounded interval; unrelated game controls remain untouched.",
+      "verify": "npm run validate:extension && node --check chrome-extension/background.js && git diff --check",
+      "visual": null,
+      "depends_on": [],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Added bounded known-container consent cleanup that selects only exact reject/decline/necessary-only actions, uses container-scoped close fallback and cosmetic hiding, and never directly manipulates cookies or storage."
+    },
+    {
+      "id": "T2",
+      "title": "Package and publish consent cleanup",
+      "intent": "Release the consent cleanup as extension 1.0.8 with accurate in-app and installation copy.",
+      "files": ["chrome-extension/manifest.json", "app/page.tsx", "README.md", "public/extension-install.html", "public/downloads/puzzle-date-game-reset.zip", "scripts/validate-extension.mjs", "/Users/shikha/Desktop/PuzzleDate/chrome-extension/"],
+      "constraints": "Describe reject/dismiss behavior accurately; do not claim universal support; retain ad-block and reset documentation; sync only verified files.",
+      "acceptance": "Version 1.0.8 is packaged, Chrome-tested, published, and the live in-app download serves the exact tested ZIP.",
+      "verify": "npm run validate:extension && npm run package:extension && npm run build:pages && unzip -t public/downloads/puzzle-date-game-reset.zip",
+      "visual": "Reload 1.0.8 and verify representative embedded games remain usable and known consent overlays do not obstruct them.",
+      "depends_on": ["T1"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Released extension 1.0.8 after a controlled Chrome test proved a recognized dialog containing both Accept All and Reject All selected Reject All, plus Waffle load and Verticle Start Over regressions passed; packaged the exact four-file ZIP and updated all user-facing download copy."
+    }
+  ]
+}

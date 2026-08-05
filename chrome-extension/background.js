@@ -54,7 +54,95 @@ const AD_BLOCK_COSMETIC_CSS = `
     display: none !important;
     visibility: hidden !important;
   }
+
+  #onetrust-banner-sdk,
+  #onetrust-consent-sdk,
+  .fc-consent-root,
+  [class*="fc-consent-root"],
+  [id^="sp_message_container_"],
+  .qc-cmp2-container,
+  #qc-cmp2-container,
+  [class~="cookie-consent"],
+  [class~="cookie-consent-banner"],
+  [class~="cookie-banner"],
+  [id="cookie-consent"],
+  [id="cookie-consent-banner"],
+  [id="cookie-banner"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
 `;
+
+const handleConsentUi = () => {
+  const containerSelectors = [
+    "#onetrust-banner-sdk",
+    "#onetrust-consent-sdk",
+    ".fc-consent-root",
+    '[class*="fc-consent-root"]',
+    '[id^="sp_message_container_"]',
+    ".qc-cmp2-container",
+    "#qc-cmp2-container",
+    '[class~="cookie-consent"]',
+    '[class~="cookie-consent-banner"]',
+    '[class~="cookie-banner"]',
+    '[id="cookie-consent"]',
+    '[id="cookie-consent-banner"]',
+    '[id="cookie-banner"]',
+  ];
+  const privacyLabels = new Set([
+    "reject all",
+    "decline all",
+    "necessary only",
+    "essential only",
+    "continue without accepting",
+    "do not consent",
+  ]);
+  const closeSelectors = [
+    ".onetrust-close-btn-handler",
+    ".qc-cmp2-close-icon",
+    'button[aria-label="Close"]',
+    'button[aria-label="close"]',
+    '[role="button"][aria-label="Close"]',
+    '[role="button"][aria-label="close"]',
+    'button[title="Close"]',
+    'button[title="close"]',
+  ];
+  const normalizeLabel = (element) =>
+    (element.getAttribute("aria-label") || element.textContent || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+
+  const cleanKnownContainers = () => {
+    const containers = document.querySelectorAll(containerSelectors.join(","));
+    for (const container of containers) {
+      const controls = container.querySelectorAll(
+        'button, [role="button"], input[type="button"], input[type="submit"], a',
+      );
+      const privacyControl = [...controls].find((control) =>
+        privacyLabels.has(normalizeLabel(control)),
+      );
+      if (privacyControl) {
+        privacyControl.click();
+        continue;
+      }
+      container.querySelector(closeSelectors.join(","))?.click();
+    }
+  };
+
+  cleanKnownContainers();
+  const marker = "puzzleDateConsentCleanupActive";
+  if (document.documentElement.dataset[marker] === "true") return;
+  document.documentElement.dataset[marker] = "true";
+  const observer = new MutationObserver(cleanKnownContainers);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  globalThis.setTimeout(() => {
+    observer.disconnect();
+    delete document.documentElement.dataset[marker];
+    cleanKnownContainers();
+  }, 12000);
+};
 
 const adBlockRuleIdForTab = (tabId) => {
   if (!Number.isInteger(tabId) || tabId < 0 || tabId >= 2147483647) return null;
@@ -77,6 +165,11 @@ const insertAdBlockCss = async (tabId, frameId) => {
       target: { tabId, frameIds: [frameId] },
       css: AD_BLOCK_COSMETIC_CSS,
       origin: "USER",
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      world: "MAIN",
+      func: handleConsentUi,
     });
   } catch {
     // Some browser-internal or otherwise restricted child frames cannot be styled.

@@ -110,9 +110,13 @@
         make “Start Over” work for supported games.
       </p>
       <p>
-        Version 1.0.7 also blocks common ads and trackers while games are
-        embedded inside Puzzle Date. It does not block ads during ordinary
-        browsing or accept or dismiss cookie consent messages.
+        Version 1.0.8 also blocks common ads and trackers while games are
+        embedded inside Puzzle Date. In recognized cookie-consent dialogs, it
+        automatically rejects or declines optional cookies, or limits consent
+        to necessary cookies. If no privacy-preserving choice exists, it
+        dismisses or hides the recognized banner. This is best-effort, not
+        universal, and never chooses “Accept all.” Ordinary browsing is
+        unaffected.
       </p>
       <a class="download" href="downloads/puzzle-date-game-reset.zip" download>
         Download the Chrome extension
@@ -132,14 +136,14 @@
 
       <h2>Update an existing installation</h2>
       <ol>
-        <li>Download and unzip the new <strong>version 1.0.7</strong> folder.</li>
+        <li>Download and unzip the new <strong>version 1.0.8</strong> folder.</li>
         <li>Open <code>chrome://extensions</code>.</li>
         <li>
           On the Puzzle Date Game Reset card, click <strong>Remove</strong>, then
           choose <strong>Load unpacked</strong> and select the new folder that
           directly contains <code>manifest.json</code>.
         </li>
-        <li>Refresh Puzzle Date. The extension card should show version 1.0.7.</li>
+        <li>Refresh Puzzle Date. The extension card should show version 1.0.8.</li>
       </ol>
 
       <h2>What “Start Over” resets</h2>
