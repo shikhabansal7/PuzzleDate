@@ -47,6 +47,7 @@ const normalizeHostnames = (value) => {
 
 window.addEventListener("PUZZLE_DATE_EXTENSION_PING", advertiseReadiness);
 advertiseReadiness();
+chrome.runtime.sendMessage({ type: "ENABLE_PUZZLE_DATE_AD_BLOCK" });
 
 window.addEventListener("PUZZLE_DATE_REGISTER_CUSTOM_GAMES", (event) => {
   const hostnames = normalizeHostnames(event.detail?.hostnames);

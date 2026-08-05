@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Puzzle Date Game Reset",
-  "version": "1.0.6",
-  "description": "Embeds Puzzle Date games and resets supported game progress.",
+  "version": "1.0.7",
+  "description": "Embeds Puzzle Date games, resets supported progress, and blocks common ads and trackers inside Puzzle Date.",
   "permissions": [
     "activeTab",
     "scripting",

@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.6") fail("release version must be 1.0.6");
+if (manifest.version !== "1.0.7") fail("release version must be 1.0.7");
 if (!manifest.permissions?.includes("declarativeNetRequest")) {
   fail("declarativeNetRequest permission is required");
 }
@@ -71,6 +71,47 @@ if (!equalSet(rule.condition?.requestDomains ?? [], configuredDomains)) {
 
 const backgroundSource = await readFile(path.join(extensionDirectory, "background.js"), "utf8");
 const contentSource = await readFile(path.join(extensionDirectory, "content.js"), "utf8");
+const readStringArray = (source, constantName) => {
+  const body = source.match(new RegExp(`const ${constantName} = \\[([\\s\\S]*?)\\n\\];`))?.[1];
+  if (!body) fail(`background is missing ${constantName}`);
+  return [...body.matchAll(/"([^"]+)"/g)].map(([, value]) => value);
+};
+const expectedAdDomains = [
+  "2mdn.net",
+  "adnxs.com",
+  "adsrvr.org",
+  "amazon-adsystem.com",
+  "criteo.com",
+  "criteo.net",
+  "doubleclick.net",
+  "googleadservices.com",
+  "googlesyndication.com",
+  "openx.net",
+  "outbrain.com",
+  "pubmatic.com",
+  "rubiconproject.com",
+  "taboola.com",
+];
+if (!equalSet(readStringArray(backgroundSource, "AD_SERVING_DOMAINS"), expectedAdDomains)) {
+  fail("ad blocking must use exactly the reviewed ad-serving domains");
+}
+if (!equalSet(readStringArray(backgroundSource, "AD_BLOCK_RESOURCE_TYPES"), [
+  "image",
+  "media",
+  "script",
+  "sub_frame",
+  "xmlhttprequest",
+])) {
+  fail("ad blocking must use only the approved resource types");
+}
+for (const selector of [
+  '.pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-top"]',
+  '.pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-bottom"]',
+]) {
+  if (!backgroundSource.includes(selector)) {
+    fail(`cosmetic ad blocking is missing the NYT Connections selector ${selector}`);
+  }
+}
 for (const required of [
   "CUSTOM_GAMES_RULE_ID = 1000",
   "MAX_CUSTOM_HOSTS = 100",
@@ -81,19 +122,34 @@ for (const required of [
   'message.strategy === "custom-clear-all"',
   "localStorage.clear()",
   "getDynamicRules",
+  "ENABLE_PUZZLE_DATE_AD_BLOCK",
+  "updateSessionRules",
+  "getSessionRules",
+  "AD_SERVING_DOMAINS",
+  "AD_BLOCK_RESOURCE_TYPES",
+  "condition: {",
+  "tabIds: [tabId]",
+  "chrome.tabs.onRemoved",
+  "chrome.scripting.insertCSS",
+  "frameId === 0",
+  "isPuzzleDateSender(sender)",
 ]) {
   if (!backgroundSource.includes(required)) fail(`background is missing ${required}`);
 }
-if (/sessionStorage\.clear|indexedDB|cookies|caches\.delete/.test(backgroundSource)) {
-  fail("custom reset may only clear localStorage");
+if (/sessionStorage\.clear|indexedDB|cookies|caches\.delete|cookie|consent/i.test(backgroundSource)) {
+  fail("extension must not manipulate cookies, consent, or non-localStorage storage");
 }
 for (const required of [
   "PUZZLE_DATE_REGISTER_CUSTOM_GAMES",
   "PUZZLE_DATE_CUSTOM_GAMES_RESULT",
   'iframe.dataset.customGame !== "true"',
   'strategy === "custom-clear-all"',
+  'type: "ENABLE_PUZZLE_DATE_AD_BLOCK"',
 ]) {
   if (!contentSource.includes(required)) fail(`content script is missing ${required}`);
+}
+if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentSource)) {
+  fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
   'resetStrategy: "custom-clear-all"',

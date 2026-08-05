@@ -7,6 +7,7 @@ const RESET_STRATEGY_ORIGINS = {
   "poople-current": "https://poople.io",
 };
 const CUSTOM_GAMES_RULE_ID = 1000;
+const AD_BLOCK_RULE_ID_OFFSET = 1;
 const MAX_CUSTOM_HOSTS = 100;
 const PUZZLE_DATE_HOSTS = new Set(["shikhabansal7.github.io", "localhost"]);
 const CUSTOM_FRAME_HEADERS = [
@@ -14,6 +15,99 @@ const CUSTOM_FRAME_HEADERS = [
   "content-security-policy",
   "content-security-policy-report-only",
 ];
+const AD_SERVING_DOMAINS = [
+  "2mdn.net",
+  "adnxs.com",
+  "adsrvr.org",
+  "amazon-adsystem.com",
+  "criteo.com",
+  "criteo.net",
+  "doubleclick.net",
+  "googleadservices.com",
+  "googlesyndication.com",
+  "openx.net",
+  "outbrain.com",
+  "pubmatic.com",
+  "rubiconproject.com",
+  "taboola.com",
+];
+const AD_BLOCK_RESOURCE_TYPES = [
+  "image",
+  "media",
+  "script",
+  "sub_frame",
+  "xmlhttprequest",
+];
+const AD_BLOCK_COSMETIC_CSS = `
+  .adsbygoogle,
+  [id^="google_ads_"],
+  [data-ad-slot],
+  [data-ad-client],
+  .ad-container,
+  .ad-wrapper,
+  .advertisement,
+  .advertising,
+  .pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-top"],
+  .pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-bottom"],
+  iframe[src*="doubleclick.net"],
+  iframe[src*="googlesyndication.com"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+`;
+
+const adBlockRuleIdForTab = (tabId) => {
+  if (!Number.isInteger(tabId) || tabId < 0 || tabId >= 2147483647) return null;
+  return tabId + AD_BLOCK_RULE_ID_OFFSET;
+};
+
+const getAdBlockRuleForTab = async (tabId) => {
+  const ruleId = adBlockRuleIdForTab(tabId);
+  if (ruleId === null) return null;
+  const rules = await chrome.declarativeNetRequest.getSessionRules();
+  return rules.find(
+    (rule) => rule.id === ruleId && rule.condition?.tabIds?.includes(tabId),
+  ) ?? null;
+};
+
+const insertAdBlockCss = async (tabId, frameId) => {
+  if (frameId === 0 || !(await getAdBlockRuleForTab(tabId))) return;
+  try {
+    await chrome.scripting.insertCSS({
+      target: { tabId, frameIds: [frameId] },
+      css: AD_BLOCK_COSMETIC_CSS,
+      origin: "USER",
+    });
+  } catch {
+    // Some browser-internal or otherwise restricted child frames cannot be styled.
+  }
+};
+
+const enableAdBlockForTab = async (tabId) => {
+  const ruleId = adBlockRuleIdForTab(tabId);
+  if (ruleId === null) throw new Error("Puzzle Date tab ID is invalid.");
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [ruleId],
+    addRules: [{
+      id: ruleId,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        requestDomains: AD_SERVING_DOMAINS,
+        resourceTypes: AD_BLOCK_RESOURCE_TYPES,
+        tabIds: [tabId],
+      },
+    }],
+  });
+
+  const frames = await chrome.webNavigation.getAllFrames({ tabId });
+  await Promise.all(
+    (frames ?? [])
+      .filter((frame) => frame.frameId !== 0)
+      .map((frame) => insertAdBlockCss(tabId, frame.frameId)),
+  );
+  return { ok: true };
+};
 
 const normalizeHostnames = (value) => {
   if (!Array.isArray(value) || value.length > MAX_CUSTOM_HOSTS) return null;
@@ -150,6 +244,8 @@ const resetCurrentPuzzle = (strategy) => {
 const pendingPoopleDismissals = new Set();
 
 chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId, url }) => {
+  if (frameId !== 0) await insertAdBlockCss(tabId, frameId);
+
   const pendingKey = `${tabId}:${frameId}`;
   if (
     !pendingPoopleDismissals.has(pendingKey) ||
@@ -176,9 +272,24 @@ chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId, url }) => 
   });
 });
 
+chrome.tabs.onRemoved.addListener((tabId) => {
+  const ruleId = adBlockRuleIdForTab(tabId);
+  if (ruleId === null) return;
+  chrome.declarativeNetRequest
+    .updateSessionRules({ removeRuleIds: [ruleId] })
+    .catch(() => {});
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!sender.tab?.id || !isPuzzleDateSender(sender)) {
+  if (sender.tab?.id === undefined || !isPuzzleDateSender(sender)) {
     return;
+  }
+
+  if (message?.type === "ENABLE_PUZZLE_DATE_AD_BLOCK") {
+    enableAdBlockForTab(sender.tab.id)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true;
   }
 
   if (message?.type === "REGISTER_CUSTOM_GAMES") {

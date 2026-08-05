@@ -1,0 +1,45 @@
+{
+  "requirement": "Add an ad blocker to the Puzzle Date Chrome extension without affecting ordinary browsing.",
+  "repo": "/private/tmp/puzzledate-adblock",
+  "executionsDir": "./executions",
+  "checkpointEvery": 3,
+  "architecture": {
+    "decision": "Use a per-tab Manifest V3 session DNR block rule activated only by the trusted Puzzle Date top-frame content script, plus narrowly scoped cosmetic CSS injected only into child frames of that enabled tab.",
+    "seams": [
+      "Ad blocking must be scoped to Puzzle Date/localhost tabs and automatically removed when the tab closes.",
+      "Do not alter cookies, consent choices, storage, normal browsing, or the existing reset/embedding protocols.",
+      "Block only a reviewed list of ad-serving domains and hide common ad containers inside embedded game frames."
+    ],
+    "adr": null
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Implement scoped ad blocking",
+      "intent": "Activate per-tab network blocking and cosmetic ad hiding only for Puzzle Date tabs.",
+      "files": ["chrome-extension/background.js", "chrome-extension/content.js", "scripts/validate-extension.mjs"],
+      "constraints": "Validate trusted top-frame senders; use session rules with tabIds; clean up on tab close; never accept cookie dialogs or clear storage; preserve reset and embedding behavior.",
+      "acceptance": "A trusted Puzzle Date tab installs a tab-scoped session rule for reviewed ad domains, child frames receive cosmetic CSS, non-Puzzle Date tabs cannot enable it, and closing the tab removes its rule.",
+      "verify": "npm run validate:extension && node --check chrome-extension/background.js && node --check chrome-extension/content.js",
+      "visual": null,
+      "depends_on": [],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Implemented trusted-sender activation of per-tab session DNR ad rules, automatic tab-close cleanup, and cosmetic CSS limited to child frames; validators pin the reviewed domains/resource types and forbid cookie, consent, or storage manipulation."
+    },
+    {
+      "id": "T2",
+      "title": "Package and document the ad-blocking release",
+      "intent": "Bump the extension version, update user-facing copy, regenerate the ZIP, and publish the tested release.",
+      "files": ["chrome-extension/manifest.json", "app/page.tsx", "README.md", "public/extension-install.html", "public/downloads/puzzle-date-game-reset.zip", "scripts/validate-extension.mjs", "/Users/shikha/Desktop/PuzzleDate/chrome-extension/"],
+      "constraints": "Clearly describe that blocking applies only inside Puzzle Date; do not claim cookie consent removal; keep the stable unpacked folder synchronized.",
+      "acceptance": "The app popup and guide advertise the new version and scoped ad blocking, the public ZIP exactly contains the validated extension, and the stable unpacked folder matches it.",
+      "verify": "npm run validate:extension && npm run package:extension && npm run build:pages && unzip -t public/downloads/puzzle-date-game-reset.zip",
+      "visual": "Reload the unpacked extension, open Puzzle Date in Chrome, and verify ads are absent or blocked without breaking game frames.",
+      "depends_on": ["T1"],
+      "parallel_group": null,
+      "status": "done",
+      "result": "Released extension 1.0.7 with scoped ad-blocking copy across the manifest, app modal, README, and install guide; regenerated the four-file ZIP and passed validation, Pages build, archive integrity/listing, and diff checks."
+    }
+  ]
+}
