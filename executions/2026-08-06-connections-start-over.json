@@ -20,8 +20,8 @@
       "title": "Verify and publish",
       "files": ["/Users/shikha/Desktop/PuzzleDate/chrome-extension/", "GitHub Pages"],
       "acceptance": "The stable unpacked folder and public ZIP match tested 1.0.10; Pages serves the new app; the checkpoint branch and main are pushed.",
-      "status": "in_progress",
-      "result": ""
+      "status": "done",
+      "result": "Stable unpacked extension matches the tested source. Commit dbe5ad3 was pushed to checkpoint branch and main; GitHub Pages serves asset index-CmgWJL5q.js. The deployed ZIP is version 1.0.10, contains the exact Connections key reset, and hash-matches the tested ZIP (a8eb4373362d85f82b40a7ed0b10d23377cd9621c170919557f3370bf3b6c633)."
     }
   ]
 }
