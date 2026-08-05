@@ -385,11 +385,57 @@ const resetCurrentPuzzle = (strategy) => {
 };
 
 const pendingPoopleDismissals = new Set();
+const pendingConnectionsPlay = new Set();
 
 chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId, url }) => {
   if (frameId !== 0) await insertAdBlockCss(tabId, frameId);
 
   const pendingKey = `${tabId}:${frameId}`;
+  if (
+    pendingConnectionsPlay.has(pendingKey) &&
+    (
+      url === "https://www.nytimes.com/games/connections" ||
+      url.startsWith("https://www.nytimes.com/games/connections?") ||
+      url.startsWith("https://www.nytimes.com/games/connections#")
+    )
+  ) {
+    pendingConnectionsPlay.delete(pendingKey);
+    await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      world: "MAIN",
+      func: () => {
+        const marker = "puzzleDateConnectionsPlayPending";
+        if (!document.documentElement || document.documentElement.dataset[marker]) return;
+        document.documentElement.dataset[marker] = "true";
+
+        let observer;
+        let timeoutId;
+        const cleanup = () => {
+          observer?.disconnect();
+          clearTimeout(timeoutId);
+          delete document.documentElement?.dataset[marker];
+        };
+        const clickExactPlay = () => {
+          const button = document.querySelector('[data-testid="moment-btn-play"]');
+          if (
+            button instanceof HTMLButtonElement &&
+            button.textContent?.trim().replace(/\s+/g, " ") === "Play"
+          ) {
+            button.click();
+            cleanup();
+            return true;
+          }
+          return false;
+        };
+
+        if (clickExactPlay()) return;
+        observer = new MutationObserver(clickExactPlay);
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+        timeoutId = setTimeout(cleanup, 10000);
+      },
+    });
+  }
+
   if (
     !pendingPoopleDismissals.has(pendingKey) ||
     !url.startsWith("https://poople.io/")
@@ -521,6 +567,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         args: customReset ? [] : [message.strategy],
       });
       const result = results[0]?.result;
+      if (result?.ok && message.strategy === "connections-current") {
+        pendingConnectionsPlay.add(`${tabId}:${target.frameId}`);
+      }
       if (!result?.ok && message.strategy === "poople-current") {
         pendingPoopleDismissals.delete(`${tabId}:${target.frameId}`);
       }

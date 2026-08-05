@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.12") fail("release version must be 1.0.12");
+if (manifest.version !== "1.0.13") fail("release version must be 1.0.13");
 if (!manifest.permissions?.includes("declarativeNetRequest")) {
   fail("declarativeNetRequest permission is required");
 }
@@ -117,6 +117,31 @@ for (const required of [
 }
 if (!/data:\s*\{\s*\.\.\.savedState\.data,\s*puzzleComplete: false,\s*puzzleWon: false,\s*mistakes: 0,\s*guesses: \[\],\s*solvedCategories: \[\],\s*\}/.test(connectionsReset)) {
   fail("Connections reset must change exactly its five approved data fields");
+}
+for (const required of [
+  "const pendingConnectionsPlay = new Set()",
+  'pendingConnectionsPlay.add(`${tabId}:${target.frameId}`)',
+  "pendingConnectionsPlay.has(pendingKey)",
+  'url === "https://www.nytimes.com/games/connections"',
+  'url.startsWith("https://www.nytimes.com/games/connections?")',
+  'url.startsWith("https://www.nytimes.com/games/connections#")',
+  "pendingConnectionsPlay.delete(pendingKey)",
+  "result?.ok && message.strategy === \"connections-current\"",
+  'document.querySelector(\'[data-testid="moment-btn-play"]\')',
+  "button instanceof HTMLButtonElement",
+  '=== "Play"',
+  "button.click()",
+  "new MutationObserver(clickExactPlay)",
+  "observer.disconnect()",
+  "setTimeout(cleanup, 10000)",
+  "delete document.documentElement?.dataset[marker]",
+]) {
+  if (!backgroundSource.includes(required)) {
+    fail(`Connections Play recovery is missing ${required}`);
+  }
+}
+if (/document\.querySelector(?:All)?\(\s*[`'"]button(?:\b|[.#[:])/i.test(backgroundSource)) {
+  fail("Connections Play recovery must not query broad button selectors");
 }
 const readStringArray = (source, constantName) => {
   const body = source.match(new RegExp(`const ${constantName} = \\[([\\s\\S]*?)\\n\\];`))?.[1];
@@ -239,7 +264,7 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.12"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.13"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
