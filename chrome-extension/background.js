@@ -8,7 +8,12 @@ const RESET_STRATEGY_ORIGINS = {
   "poople-current": "https://poople.io",
 };
 const CUSTOM_GAMES_RULE_ID = 1000;
-const AD_BLOCK_RULE_ID_OFFSET = 1;
+const AD_BLOCK_RULES_PER_TAB = 3;
+const AD_BLOCK_RULE_ID_BASE = CUSTOM_GAMES_RULE_ID + 1;
+const MAX_AD_BLOCK_TAB_ID = Math.floor(
+  (2147483647 - AD_BLOCK_RULE_ID_BASE - (AD_BLOCK_RULES_PER_TAB - 1)) /
+    AD_BLOCK_RULES_PER_TAB,
+);
 const MAX_CUSTOM_HOSTS = 100;
 const PUZZLE_DATE_HOSTS = new Set(["shikhabansal7.github.io", "localhost"]);
 const CUSTOM_FRAME_HEADERS = [
@@ -31,9 +36,19 @@ const AD_SERVING_DOMAINS = [
   "openx.net",
   "outbrain.com",
   "pubmatic.com",
+  "raptivecdn.com",
   "rubiconproject.com",
   "taboola.com",
   "videoplayerhub.com",
+  "media.net",
+  "vntsm.com",
+  "ezojs.com",
+  "lngtd.com",
+  "fuseplatform.net",
+];
+const AD_BLOCK_URL_FILTERS = [
+  "||fourbythree-stats.hankmt.workers.dev/ads",
+  "||www.nytimes.com/ads/",
 ];
 const AD_BLOCK_RESOURCE_TYPES = [
   "image",
@@ -54,6 +69,19 @@ const AD_BLOCK_COSMETIC_CSS = `
   [class*="adthrive" i],
   [id*="adthrive" i],
   [data-adthrive],
+  [class*="raptive" i],
+  [id*="raptive" i],
+  .adbox,
+  .game-adbox,
+  [data-type="desktop-adhesion"],
+  [id^="ezoic-pub-ad-placeholder-"],
+  .Advertisement,
+  [data-fuse],
+  #leaderboard-ad,
+  #lhs-ad,
+  #rhs-ad,
+  .promo-banner,
+  .promo-side,
   .pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-top"],
   .pz-section.pz-section-filled.pz-ad-box.pz-desktop-only[data-testid="ad-bottom"],
   iframe[src*="doubleclick.net"],
@@ -152,17 +180,21 @@ const handleConsentUi = () => {
   }, 12000);
 };
 
-const adBlockRuleIdForTab = (tabId) => {
-  if (!Number.isInteger(tabId) || tabId < 0 || tabId >= 2147483647) return null;
-  return tabId + AD_BLOCK_RULE_ID_OFFSET;
+const adBlockRuleIdsForTab = (tabId) => {
+  if (!Number.isInteger(tabId) || tabId < 0 || tabId > MAX_AD_BLOCK_TAB_ID) return null;
+  const firstRuleId = AD_BLOCK_RULE_ID_BASE + tabId * AD_BLOCK_RULES_PER_TAB;
+  return Array.from(
+    { length: AD_BLOCK_RULES_PER_TAB },
+    (_, index) => firstRuleId + index,
+  );
 };
 
 const getAdBlockRuleForTab = async (tabId) => {
-  const ruleId = adBlockRuleIdForTab(tabId);
-  if (ruleId === null) return null;
+  const ruleIds = adBlockRuleIdsForTab(tabId);
+  if (ruleIds === null) return null;
   const rules = await chrome.declarativeNetRequest.getSessionRules();
   return rules.find(
-    (rule) => rule.id === ruleId && rule.condition?.tabIds?.includes(tabId),
+    (rule) => rule.id === ruleIds[0] && rule.condition?.tabIds?.includes(tabId),
   ) ?? null;
 };
 
@@ -185,12 +217,12 @@ const insertAdBlockCss = async (tabId, frameId) => {
 };
 
 const enableAdBlockForTab = async (tabId) => {
-  const ruleId = adBlockRuleIdForTab(tabId);
-  if (ruleId === null) throw new Error("Puzzle Date tab ID is invalid.");
+  const ruleIds = adBlockRuleIdsForTab(tabId);
+  if (ruleIds === null) throw new Error("Puzzle Date tab ID is invalid.");
   await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [ruleId],
+    removeRuleIds: ruleIds,
     addRules: [{
-      id: ruleId,
+      id: ruleIds[0],
       priority: 1,
       action: { type: "block" },
       condition: {
@@ -198,7 +230,16 @@ const enableAdBlockForTab = async (tabId) => {
         resourceTypes: AD_BLOCK_RESOURCE_TYPES,
         tabIds: [tabId],
       },
-    }],
+    }, ...AD_BLOCK_URL_FILTERS.map((urlFilter, index) => ({
+      id: ruleIds[index + 1],
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        urlFilter,
+        resourceTypes: AD_BLOCK_RESOURCE_TYPES,
+        tabIds: [tabId],
+      },
+    }))],
   });
 
   const frames = await chrome.webNavigation.getAllFrames({ tabId });
@@ -462,10 +503,10 @@ chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId, url }) => 
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  const ruleId = adBlockRuleIdForTab(tabId);
-  if (ruleId === null) return;
+  const ruleIds = adBlockRuleIdsForTab(tabId);
+  if (ruleIds === null) return;
   chrome.declarativeNetRequest
-    .updateSessionRules({ removeRuleIds: [ruleId] })
+    .updateSessionRules({ removeRuleIds: ruleIds })
     .catch(() => {});
 });
 

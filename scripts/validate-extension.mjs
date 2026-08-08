@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.13") fail("release version must be 1.0.13");
+if (manifest.version !== "1.0.14") fail("release version must be 1.0.14");
 if (!manifest.permissions?.includes("declarativeNetRequest")) {
   fail("declarativeNetRequest permission is required");
 }
@@ -163,9 +163,15 @@ const expectedAdDomains = [
   "openx.net",
   "outbrain.com",
   "pubmatic.com",
+  "raptivecdn.com",
   "rubiconproject.com",
   "taboola.com",
   "videoplayerhub.com",
+  "media.net",
+  "vntsm.com",
+  "ezojs.com",
+  "lngtd.com",
+  "fuseplatform.net",
 ];
 if (!equalSet(readStringArray(backgroundSource, "AD_SERVING_DOMAINS"), expectedAdDomains)) {
   fail("ad blocking must use exactly the reviewed ad-serving domains");
@@ -186,9 +192,82 @@ for (const selector of [
   '[id*="adthrive" i]',
   '[data-adthrive]',
   'iframe[src*="videoplayerhub.com"]',
+  '[class*="raptive" i]',
+  '[id*="raptive" i]',
+  '.adbox',
+  '.game-adbox',
+  '[data-type="desktop-adhesion"]',
+  '[id^="ezoic-pub-ad-placeholder-"]',
+  '.Advertisement',
+  '[data-fuse]',
+  '#leaderboard-ad',
+  '#lhs-ad',
+  '#rhs-ad',
+  '.promo-banner',
+  '.promo-side',
 ]) {
   if (!backgroundSource.includes(selector)) {
     fail(`cosmetic ad blocking is missing the reviewed selector ${selector}`);
+  }
+}
+const expectedAdUrlFilters = [
+  "||fourbythree-stats.hankmt.workers.dev/ads",
+  "||www.nytimes.com/ads/",
+];
+if (!equalSet(readStringArray(backgroundSource, "AD_BLOCK_URL_FILTERS"), expectedAdUrlFilters)) {
+  fail("ad blocking must use exactly the reviewed path filters");
+}
+for (const required of [
+  "AD_BLOCK_RULES_PER_TAB = 3",
+  "AD_BLOCK_RULE_ID_BASE = CUSTOM_GAMES_RULE_ID + 1",
+  "MAX_AD_BLOCK_TAB_ID",
+  "2147483647 - AD_BLOCK_RULE_ID_BASE - (AD_BLOCK_RULES_PER_TAB - 1)",
+  "adBlockRuleIdsForTab",
+  "AD_BLOCK_RULE_ID_BASE + tabId * AD_BLOCK_RULES_PER_TAB",
+  "removeRuleIds: ruleIds",
+  "...AD_BLOCK_URL_FILTERS.map",
+  "urlFilter,",
+  "ruleIds[index + 1]",
+]) {
+  if (!backgroundSource.includes(required)) {
+    fail(`path-scoped ad rules are missing ${required}`);
+  }
+}
+const customGamesRuleId = 1000;
+const adBlockRulesPerTab = 3;
+const adBlockRuleIdBase = customGamesRuleId + 1;
+const maximumRuleId = 2147483647;
+const maximumAdBlockTabId = Math.floor(
+  (maximumRuleId - adBlockRuleIdBase - (adBlockRulesPerTab - 1)) /
+    adBlockRulesPerTab,
+);
+const generatedAdBlockRuleIds = (tabId) =>
+  Array.from(
+    { length: adBlockRulesPerTab },
+    (_, index) => adBlockRuleIdBase + tabId * adBlockRulesPerTab + index,
+  );
+const representativeTabIds = [0, 1, 333, maximumAdBlockTabId];
+const representativeRuleIds = representativeTabIds.flatMap(generatedAdBlockRuleIds);
+if (
+  representativeRuleIds.some(
+    (ruleId) =>
+      !Number.isInteger(ruleId) ||
+      ruleId <= customGamesRuleId ||
+      ruleId > maximumRuleId,
+  ) ||
+  new Set(representativeRuleIds).size !== representativeRuleIds.length
+) {
+  fail("generated per-tab ad rule IDs must be valid, unique, and above the custom-game rule ID");
+}
+if (generatedAdBlockRuleIds(333).includes(customGamesRuleId)) {
+  fail("tab 333 ad rules must not collide with the custom-game rule ID");
+}
+if (backgroundSource.includes('"workers.dev"') || backgroundSource.includes('"nytimes.com"')) {
+  fail("ad blocking must not block entire workers.dev or nytimes.com hosts");
+}
+for (const forbidden of ["googletagmanager.com", "google-analytics.com", "analytics.google.com"]) {
+  if (expectedAdDomains.includes(forbidden) || backgroundSource.includes(`"${forbidden}"`)) {
+    fail(`ad blocking must not add the unreviewed broad service ${forbidden}`);
   }
 }
 for (const required of [
@@ -264,17 +343,48 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.13"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.14"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
   'extension-health-light--${extensionHealth}',
   'className="visually-hidden"',
   'resetStrategy: "custom-clear-all"',
-  'data-custom-game={puzzle.custom ? "true" : undefined}',
+  'data-custom-game={activePuzzle.custom ? "true" : undefined}',
   "setCustomFrameRevision",
+  'className="game-frame active"',
+  'loading="eager"',
+  'link.rel = rel',
+  'link.dataset.puzzleDateHint = rel',
+  'link.crossOrigin = crossOrigin',
+  'link.as = as',
+  'return () => hints.forEach((link) => link.remove())',
+  '["http:", "https:"].includes(nextUrl.protocol)',
 ]) {
   if (!pageSource.includes(required)) fail(`app is missing ${required}`);
+}
+if (pageSource.includes("framedPuzzles") || pageSource.includes("game-frame preloaded") || pageSource.includes("(preloaded)")) {
+  fail("app must not create a preloaded puzzle iframe");
+}
+if ((pageSource.match(/<iframe\b/g) ?? []).length !== 1) {
+  fail("app must render exactly one active puzzle iframe declaration");
+}
+if (!pageSource.includes("document.head.querySelector(selector)")) {
+  fail("app must avoid duplicate next-puzzle resource hints");
+}
+for (const [relativePath, source] of [
+  ["README.md", await readFile(path.join(projectRoot, "README.md"), "utf8")],
+  ["public/extension-install.html", await readFile(path.join(projectRoot, "public", "extension-install.html"), "utf8")],
+]) {
+  if (!source.includes("Version 1.0.14") && !source.includes("version 1.0.14")) {
+    fail(`${relativePath} must document release 1.0.14`);
+  }
+  if (!source.includes("without creating the next iframe")) {
+    fail(`${relativePath} must explain timer-safe preload`);
+  }
+  if (!source.includes("audited ad blocking")) {
+    fail(`${relativePath} must explain expanded audited ad blocking`);
+  }
 }
 
 for (const file of ["background.js", "content.js"]) {

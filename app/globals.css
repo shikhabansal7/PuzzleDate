@@ -469,13 +469,6 @@ iframe {
   background: #fff;
 }
 
-.game-frame.preloaded {
-  position: absolute;
-  inset: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
 .controls {
   padding: 0 14px;
 }

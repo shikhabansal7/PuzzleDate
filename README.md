@@ -95,11 +95,14 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 ## Share the Chrome extension
 
 Puzzle Date's companion Chrome extension embeds the complete built-in game
-rotation. Version 1.0.13 also registers the hostname of each game added through
+rotation. Version 1.0.14 also registers the hostname of each game added through
 the plus button so that game can embed inside Puzzle Date.
 
-Version 1.0.13 blocks common ads and trackers, including Word 500's verified
-Raptive and video-ad services, only while games are embedded inside Puzzle Date.
+Version 1.0.14 expands audited ad blocking across embedded games, including
+Word 500's verified Raptive and video-ad services and narrow game-specific ad
+paths, only while games are embedded inside Puzzle Date. Next-game preload warms
+network resources without creating the next iframe, so game timers do not start
+before the player reaches that game.
 After Connections is reset, it also reopens the same puzzle automatically
 instead of leaving the iframe on the Play screen.
 In recognized cookie-consent dialogs there, it automatically
@@ -140,17 +143,17 @@ This writes `public/downloads/puzzle-date-game-reset.zip`. To install it:
 5. Refresh Puzzle Date if it was already open.
 
 Chrome does not automatically replace a manually loaded extension. To upgrade
-an existing installation to version 1.0.13:
+an existing installation to version 1.0.14:
 
 1. Download the new ZIP and unzip it to a new folder.
 2. Open `chrome://extensions`.
 3. Remove the old **Puzzle Date Game Reset** card.
 4. Click **Load unpacked** and select the new folder that directly contains
    `manifest.json`.
-5. Refresh Puzzle Date and confirm the extension card shows version 1.0.13.
+5. Refresh Puzzle Date and confirm the extension card shows version 1.0.14.
 
 The light beside Puzzle Date's **Extension** button is red when the extension is
-missing, yellow when it needs an update, and green when version 1.0.13 is ready.
+missing, yellow when it needs an update, and green when version 1.0.14 is ready.
 
 The framing rules are limited to iframe requests initiated by Puzzle Date (or
 localhost during development), to the configured built-in domains and custom

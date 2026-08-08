@@ -23,7 +23,7 @@ type ResetStrategy =
   | "poople-current"
   | "custom-clear-all";
 
-const EXPECTED_EXTENSION_VERSION = "1.0.13";
+const EXPECTED_EXTENSION_VERSION = "1.0.14";
 
 const validExtensionVersion = (value: unknown) =>
   typeof value === "string" && /^\d+\.\d+\.\d+$/.test(value)
@@ -177,6 +177,7 @@ export default function Home() {
   const pendingCustomHostsRef = useRef<string[]>([]);
   const activePuzzle = orderedPuzzles[activeIndex];
   const nextPuzzle = orderedPuzzles[activeIndex + 1];
+  const nextPuzzleUrl = nextPuzzle?.url;
   const extensionReady = extensionStatus === "ready";
   const extensionHealth = !extensionReady
     ? "missing"
@@ -196,14 +197,38 @@ export default function Home() {
       ? extensionReady && registeredCustomHosts.has(customHost(puzzle))
       : puzzle.canEmbed !== false || extensionReady;
   const activePuzzleCanEmbed = canFramePuzzle(activePuzzle);
-  const framedPuzzles = [
-    ...(activePuzzleCanEmbed
-      ? [{ puzzle: activePuzzle, isActive: true }]
-      : []),
-    ...(nextPuzzle && canFramePuzzle(nextPuzzle)
-      ? [{ puzzle: nextPuzzle, isActive: false }]
-      : []),
-  ];
+
+  useEffect(() => {
+    if (!nextPuzzleUrl) return;
+
+    let nextUrl: URL;
+    try {
+      nextUrl = new URL(nextPuzzleUrl);
+    } catch {
+      return;
+    }
+    if (!["http:", "https:"].includes(nextUrl.protocol)) return;
+
+    const hints = [
+      { rel: "preconnect", href: nextUrl.origin, crossOrigin: "anonymous" },
+      { rel: "dns-prefetch", href: nextUrl.origin },
+      { rel: "prefetch", href: nextUrl.href, as: "document" },
+    ].flatMap(({ rel, href, crossOrigin, as }) => {
+      const selector = `link[data-puzzle-date-hint="${rel}"][href="${CSS.escape(href)}"]`;
+      if (document.head.querySelector(selector)) return [];
+
+      const link = document.createElement("link");
+      link.rel = rel;
+      link.href = href;
+      link.dataset.puzzleDateHint = rel;
+      if (crossOrigin) link.crossOrigin = crossOrigin;
+      if (as) link.as = as;
+      document.head.appendChild(link);
+      return [link];
+    });
+
+    return () => hints.forEach((link) => link.remove());
+  }, [nextPuzzleUrl]);
 
   const openInNewTab = useCallback((puzzle: Puzzle) => {
     const link = document.createElement("a");
@@ -615,16 +640,17 @@ export default function Home() {
             >
               ×
             </button>
-            <p className="eyebrow">Chrome extension · Version 1.0.13</p>
+            <p className="eyebrow">Chrome extension · Version 1.0.14</p>
             <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
             <p>
               Install the extension once to embed supported games and let Puzzle
               Date reset them from inside the app.
             </p>
             <p>
-              Version 1.0.13 also blocks common ads and trackers—including Word
-              500&apos;s verified ad services—while games are embedded inside Puzzle
-              Date. It also reopens Connections automatically after Start Over
+              Version 1.0.14 expands audited ad blocking across the embedded games,
+              including verified Word 500 services and narrow game-specific ad paths.
+              Next-game preload now warms network resources without creating the next
+              iframe, so timers do not begin before you reach a game. It also reopens Connections automatically after Start Over
               instead of leaving the iframe on the Play screen. In recognized cookie-consent dialogs,
               it rejects or declines optional cookies, or limits consent to
               necessary cookies. If no privacy-preserving choice exists, it
@@ -637,7 +663,7 @@ export default function Home() {
               href="/PuzzleDate/downloads/puzzle-date-game-reset.zip"
               download
             >
-              Download extension 1.0.13
+              Download extension 1.0.14
             </a>
             <div className="extension-guide-steps">
               <section aria-labelledby="new-install-title">
@@ -659,14 +685,14 @@ export default function Home() {
                 <h3 id="update-install-title">Already installed?</h3>
                 <ol>
                   <li>Remove the old Puzzle Date extension in Chrome.</li>
-                  <li>Download and unzip version 1.0.13.</li>
+                  <li>Download and unzip version 1.0.14.</li>
                   <li>Load the new folder, then refresh Puzzle Date.</li>
                 </ol>
               </section>
             </div>
             <p>
               The light beside Extension is red when it is missing, yellow when
-              an update is available, and green when version 1.0.13 is ready.
+              an update is available, and green when version 1.0.14 is ready.
             </p>
             <p className="extension-reset-warning">
               <strong>Custom-game warning:</strong> Start Over clears all local
@@ -702,24 +728,20 @@ export default function Home() {
             </a>
           </div>
         )}
-        {framedPuzzles.map(({ puzzle, isActive }) => (
+        {activePuzzleCanEmbed && (
           <iframe
-            key={`${puzzle.url}:${puzzle.custom ? customFrameRevision : 0}`}
-            className={isActive ? "game-frame active" : "game-frame preloaded"}
-            src={puzzle.url}
-            title={isActive ? puzzle.name : `${puzzle.name} (preloaded)`}
-            aria-hidden={isActive ? undefined : true}
-            tabIndex={isActive ? undefined : -1}
+            key={`${activePuzzle.url}:${activePuzzle.custom ? customFrameRevision : 0}`}
+            className="game-frame active"
+            src={activePuzzle.url}
+            title={activePuzzle.name}
             loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
             allow="fullscreen; clipboard-read; clipboard-write; storage-access"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-presentation"
-            data-custom-game={puzzle.custom ? "true" : undefined}
-            onPointerLeave={
-              isActive ? () => appShellRef.current?.focus() : undefined
-            }
+            data-custom-game={activePuzzle.custom ? "true" : undefined}
+            onPointerLeave={() => appShellRef.current?.focus()}
           />
-        ))}
+        )}
       </section>
 
       <nav

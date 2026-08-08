@@ -1,0 +1,58 @@
+{
+  "requirement": "Remove remaining embedded-game ads and keep eager loading without starting timers before a game becomes active.",
+  "repo": "/private/tmp/puzzledate-timer-ads",
+  "executionsDir": "./executions",
+  "checkpointEvery": 3,
+  "architecture": {
+    "decision": "Never execute the next game in a hidden iframe. Warm its origin and document with preconnect, dns-prefetch, and prefetch links; mount the iframe only when active. Extend the existing tab-scoped blocker only with ad systems verified in current game pages.",
+    "seams": [
+      "No inactive third-party iframe may exist, so hidden timers, analytics, audio, or popups cannot start.",
+      "The next game still receives best-effort network warming without executing its JavaScript.",
+      "Ad blocking remains limited to Puzzle Date-enabled tabs and must not block first-party gameplay services."
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Audit remaining game ad systems",
+      "intent": "Inspect the public HTML/scripts of every current game and identify only confirmed remaining ad roots and narrow cosmetic markers.",
+      "files": [],
+      "acceptance": "A source-backed list maps each affected game to confirmed domains/selectors, with uncertain or gameplay-critical endpoints excluded.",
+      "verify": "Supervisor rechecks representative public HTML/script evidence.",
+      "status": "done",
+      "result": "Confirmed missing roots: raptivecdn.com, media.net, vntsm.com, ezojs.com, lngtd.com, fuseplatform.net; exact first-party ad paths: ||fourbythree-stats.hankmt.workers.dev/ads and ||www.nytimes.com/ads/; narrow selectors mapped for Word500, Waffle, Unwordle, Poople, and 4x3. FoxiMax, Verticle, and Full Circle had no confirmed additions; Chain It was excluded after a security checkpoint. Supervisor independently reverified Unwordle Ezoic, Poople Fuse, Word Salad Longitude, and Waffle page evidence."
+    },
+    {
+      "id": "T2",
+      "title": "Replace hidden iframe preload with timer-safe warming",
+      "intent": "Mount only the active iframe and warm the next game using document/origin resource hints.",
+      "files": ["app/page.tsx", "app/globals.css", "scripts/validate-extension.mjs"],
+      "acceptance": "No inactive iframe is rendered; the next URL gets preconnect/dns-prefetch/prefetch hints; Unwordle cannot start its timer before activation; active navigation and new-tab games remain unchanged.",
+      "verify": "npm run build:pages && npm run validate:extension && git diff --check plus DOM verification.",
+      "depends_on": ["T1"],
+      "status": "done",
+      "result": "Removed the hidden next-game iframe and its preloaded CSS. Only the active iframe renders; the next game receives deduplicated preconnect, dns-prefetch, and document-prefetch links that are cleaned up on rotation changes. Build, extension validation, and diff checks pass. Focused lint reports only two pre-existing set-state-in-effect diagnostics."
+    },
+    {
+      "id": "T3",
+      "title": "Block confirmed remaining ads and package release",
+      "intent": "Add the audited ad endpoints/selectors, bump the extension version, update release copy, and regenerate the ZIP.",
+      "files": ["chrome-extension/background.js", "chrome-extension/manifest.json", "app/page.tsx", "README.md", "public/extension-install.html", "public/downloads/puzzle-date-game-reset.zip", "scripts/validate-extension.mjs"],
+      "acceptance": "Confirmed remaining ads are blocked without broad gameplay selectors; version and package agree; all automated checks pass.",
+      "verify": "npm run validate:extension && npm run package:extension && npm run build:pages && unzip -t public/downloads/puzzle-date-game-reset.zip && node --check chrome-extension/background.js && git diff --check.",
+      "depends_on": ["T2"],
+      "status": "done",
+      "result": "Version 1.0.14 adds the six audited ad roots, two path-only first-party filters, and narrow game-specific selectors. Three collision-safe session rules per Puzzle Date tab cover domain and exact-path blocking and are all removed on tab close. Release copy and ZIP are updated; validation, packaging, Pages build, ZIP/source equality, JS syntax, and diff checks pass."
+    },
+    {
+      "id": "T4",
+      "title": "Verify and publish",
+      "intent": "Verify rendered behavior/package integrity, sync the stable extension folder, commit, push checkpoint/main, and confirm GitHub Pages artifacts.",
+      "files": ["/Users/shikha/Desktop/PuzzleDate/chrome-extension/", "GitHub Pages"],
+      "acceptance": "Live app has no hidden next iframe, public ZIP matches tested source, and the deployed asset/version are current.",
+      "depends_on": ["T3"],
+      "status": "in_progress",
+      "result": ""
+    }
+  ]
+}
