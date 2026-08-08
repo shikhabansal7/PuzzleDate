@@ -51,8 +51,8 @@
       "files": ["/Users/shikha/Desktop/PuzzleDate/chrome-extension/", "GitHub Pages"],
       "acceptance": "Live app has no hidden next iframe, public ZIP matches tested source, and the deployed asset/version are current.",
       "depends_on": ["T3"],
-      "status": "in_progress",
-      "result": ""
+      "status": "done",
+      "result": "Rendered production verification showed zero inactive iframes with Unwordle only present as three resource hints, then exactly one Unwordle iframe after navigation; no console errors. Stable extension matches source. Commit aae49ad was pushed to checkpoint and main; Pages serves index-gIY8s5sW.js/index-mmsTaorG.css. Live ZIP is 1.0.14 and hash-matches the tested archive (7775c6c42a19844af34fab0ad1ccf79eb54d502da3be9399518127261096d227)."
     }
   ]
 }
