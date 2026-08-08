@@ -73,6 +73,8 @@ const AD_BLOCK_COSMETIC_CSS = `
   [id*="raptive" i],
   .adbox,
   .game-adbox,
+  .top-banner-container,
+  .bottom-banner-container,
   [data-type="desktop-adhesion"],
   [id^="ezoic-pub-ad-placeholder-"],
   .Advertisement,

@@ -15,7 +15,10 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.14") fail("release version must be 1.0.14");
+if (manifest.version !== "1.0.15") fail("release version must be 1.0.15");
+if (manifest.content_scripts?.[0]?.run_at !== "document_start") {
+  fail("app content script must run at document_start to minimize the frame-policy race");
+}
 if (!manifest.permissions?.includes("declarativeNetRequest")) {
   fail("declarativeNetRequest permission is required");
 }
@@ -196,6 +199,8 @@ for (const selector of [
   '[id*="raptive" i]',
   '.adbox',
   '.game-adbox',
+  '.top-banner-container',
+  '.bottom-banner-container',
   '[data-type="desktop-adhesion"]',
   '[id^="ezoic-pub-ad-placeholder-"]',
   '.Advertisement',
@@ -343,7 +348,7 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.14"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.15"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
@@ -376,8 +381,8 @@ for (const [relativePath, source] of [
   ["README.md", await readFile(path.join(projectRoot, "README.md"), "utf8")],
   ["public/extension-install.html", await readFile(path.join(projectRoot, "public", "extension-install.html"), "utf8")],
 ]) {
-  if (!source.includes("Version 1.0.14") && !source.includes("version 1.0.14")) {
-    fail(`${relativePath} must document release 1.0.14`);
+  if (!source.includes("Version 1.0.15") && !source.includes("version 1.0.15")) {
+    fail(`${relativePath} must document release 1.0.15`);
   }
   if (!source.includes("without creating the next iframe")) {
     fail(`${relativePath} must explain timer-safe preload`);
