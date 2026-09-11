@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.18") fail("release version must be 1.0.18");
+if (manifest.version !== "1.0.19") fail("release version must be 1.0.19");
 if (manifest.content_scripts?.[0]?.run_at !== "document_start") {
   fail("app content script must run at document_start to minimize the frame-policy race");
 }
@@ -258,6 +258,61 @@ const expectedAdDomains = [
   "ezojs.com",
   "lngtd.com",
   "fuseplatform.net",
+  "33across.com",
+  "3lift.com",
+  "4dex.io",
+  "a-mo.net",
+  "a-mx.com",
+  "ad-delivery.net",
+  "ad.gt",
+  "adtrafficquality.google",
+  "atmtd.com",
+  "ay.delivery",
+  "btloader.com",
+  "casalemedia.com",
+  "ccgateway.net",
+  "connectad.io",
+  "cootlogix.com",
+  "crwdcntrl.net",
+  "dotomi.com",
+  "ezodn.com",
+  "ezoic.com",
+  "ezoic.net",
+  "fastclick.net",
+  "flashtalking.com",
+  "gumgum.com",
+  "hadronid.net",
+  "id5-sync.com",
+  "imrworldwide.com",
+  "ingage.tech",
+  "kargo.com",
+  "kueezrtb.com",
+  "liadm.com",
+  "marphezis.com",
+  "nexx360.io",
+  "omnitagjs.com",
+  "onetag-sys.com",
+  "pghub.io",
+  "postrelease.com",
+  "privacymanager.io",
+  "pubgw.yahoo.com",
+  "quantcount.com",
+  "quantserve.com",
+  "raptive.com",
+  "richaudience.com",
+  "rkdms.com",
+  "rlcdn.com",
+  "scorecardresearch.com",
+  "seedtag.com",
+  "servenobid.com",
+  "sharethrough.com",
+  "smartadserver.com",
+  "smilewanted.com",
+  "teads.tv",
+  "trustedstack.com",
+  "venatusmedia.com",
+  "vntsm.io",
+  "yellowblue.io",
 ];
 if (!equalSet(readStringArray(backgroundSource, "AD_SERVING_DOMAINS"), expectedAdDomains)) {
   fail("ad blocking must use exactly the reviewed ad-serving domains");
@@ -353,10 +408,31 @@ if (generatedAdBlockRuleIds(333).includes(customGamesRuleId)) {
 if (backgroundSource.includes('"workers.dev"') || backgroundSource.includes('"nytimes.com"')) {
   fail("ad blocking must not block entire workers.dev or nytimes.com hosts");
 }
-for (const forbidden of ["googletagmanager.com", "google-analytics.com", "analytics.google.com"]) {
+// Analytics, consent gates, login providers, players and generic CDNs are not
+// ads; blocking them breaks the games rather than cleaning them up.
+for (const forbidden of [
+  "googletagmanager.com",
+  "google-analytics.com",
+  "analytics.google.com",
+  "googleapis.com",
+  "gstatic.com",
+  "google.com",
+  "yahoo.com",
+  "facebook.net",
+  "jsdelivr.net",
+  "jwplayer.com",
+  "amplitude.com",
+  "gatekeeperconsent.com",
+  "cloudflareinsights.com",
+  "iconify.design",
+  "ko-fi.com",
+]) {
   if (expectedAdDomains.includes(forbidden) || backgroundSource.includes(`"${forbidden}"`)) {
     fail(`ad blocking must not add the unreviewed broad service ${forbidden}`);
   }
+}
+if (new Set(expectedAdDomains).size !== expectedAdDomains.length) {
+  fail("ad-serving domains must not contain duplicates");
 }
 for (const required of [
   "CUSTOM_GAMES_RULE_ID = 1000",
@@ -431,7 +507,7 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.18"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.19"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
@@ -493,8 +569,8 @@ for (const [relativePath, source] of [
   ["README.md", await readFile(path.join(projectRoot, "README.md"), "utf8")],
   ["public/extension-install.html", await readFile(path.join(projectRoot, "public", "extension-install.html"), "utf8")],
 ]) {
-  if (!source.includes("Version 1.0.18") && !source.includes("version 1.0.18")) {
-    fail(`${relativePath} must document release 1.0.18`);
+  if (!source.includes("Version 1.0.19") && !source.includes("version 1.0.19")) {
+    fail(`${relativePath} must document release 1.0.19`);
   }
   if (!source.includes("without creating the next iframe")) {
     fail(`${relativePath} must explain timer-safe preload`);
@@ -514,6 +590,7 @@ for (const file of ["background.js", "content.js"]) {
 for (const [label, script] of [
   ["arrow-key relay", "check-arrow-relay.mjs"],
   ["clock shim", "check-clock-shim.mjs"],
+  ["ad coverage", "check-ad-coverage.mjs"],
 ]) {
   const result = spawnSync(
     process.execPath,

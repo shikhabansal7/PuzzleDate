@@ -26,6 +26,7 @@ Deployed as a static site to **GitHub Pages** at `https://shikhabansal7.github.i
 | `scripts/validate-extension.mjs` | Hard gate. Asserts extension + app source match the audited release contract. |
 | `scripts/check-arrow-relay.mjs` | Behavioral check of the arrow-key relay's guards against a stub DOM. Spawned by the validator. |
 | `scripts/check-clock-shim.mjs` | Replays each clock-derived game's real day formula through the shimmed `Date`. Spawned by the validator. |
+| `scripts/check-ad-coverage.mjs` | Replays real third-party hosts observed on each game against `AD_SERVING_DOMAINS`. Spawned by the validator. |
 | `scripts/package-extension.mjs` | Validates, then zips the 4 extension files reproducibly into `public/downloads/`. |
 | `public/extension-install.html` | Standalone install/instructions page. |
 | `executions/*.json` | Historical task-plan records for past features. Documentation, not code. |
@@ -287,7 +288,7 @@ Same three-header removal, `requestDomains` = the registered custom hostnames,
 - **3 rules per tab**, ids allocated as `AD_BLOCK_RULE_ID_BASE + tabId * 3 + i` where
   base is `1001`, so they can never collide with rule `1000`. Tab ids above
   `MAX_AD_BLOCK_TAB_ID` are rejected.
-- Rule 1 blocks `AD_SERVING_DOMAINS` (23 audited ad networks). Rules 2–3 block the two
+- Rule 1 blocks `AD_SERVING_DOMAINS` (78 audited ad networks). Rules 2–3 block the two
   narrow first-party paths in `AD_BLOCK_URL_FILTERS`
   (`||fourbythree-stats.hankmt.workers.dev/ads`, `||www.nytimes.com/ads/`).
   Resource types: `image, media, script, sub_frame, xmlhttprequest`.
@@ -297,9 +298,22 @@ Same three-header removal, `requestDomains` = the registered custom hostnames,
   `forwardArrowKeys`, so the ad rule doubles as the "this is a Puzzle Date tab" gate.
 
 **Hard constraints the validator enforces:** never block whole `workers.dev` or
-`nytimes.com` hosts; never add `googletagmanager.com`, `google-analytics.com`, or
-`analytics.google.com`. The domain list, resource types, URL filters, and cosmetic
-selectors must match the audited lists byte-for-byte.
+`nytimes.com` hosts; never add analytics (`googletagmanager.com`,
+`google-analytics.com`, `analytics.google.com`, `amplitude.com`), consent gates
+(`gatekeeperconsent.com`), login providers (`facebook.net`, `google.com`), players
+(`jwplayer.com`), or generic CDNs (`googleapis.com`, `gstatic.com`, `jsdelivr.net`).
+The domain list, resource types, URL filters, and cosmetic selectors must match the
+audited lists byte-for-byte, with no duplicates.
+
+**The blocklist rots.** Ads reappeared in Sept 2026 with the blocking code completely
+unchanged — the games had simply added new header-bidding partners (Ezoic moved to
+`ezodn.com`/`ezoic.net`, Waffle added Venatus/`atmtd.com`/`btloader.com`, Word 500
+added Raptive's `ay.delivery` plus a dozen exchanges). Before assuming a regression,
+`git diff <last-good>..HEAD -- chrome-extension/background.js` and check whether the
+ad code changed at all. To re-audit: load each game in a browser and diff its
+third-party `performance.getEntriesByType("resource")` hosts against
+`AD_SERVING_DOMAINS`, then extend `scripts/check-ad-coverage.mjs` with what you find.
+Verticle and FoxiMax currently serve no ads at all.
 
 ### Cookie consent (`handleConsentUi`)
 
