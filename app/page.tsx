@@ -23,7 +23,7 @@ type ResetStrategy =
   | "poople-current"
   | "custom-clear-all";
 
-const EXPECTED_EXTENSION_VERSION = "1.0.17";
+const EXPECTED_EXTENSION_VERSION = "1.0.18";
 
 const validExtensionVersion = (value: unknown) =>
   typeof value === "string" && /^\d+\.\d+\.\d+$/.test(value)
@@ -123,6 +123,19 @@ const ARCHIVE_URLS: Record<string, (date: string) => string> = {
     `https://www.hankgreen.com/fourbythree/#d=${date}`,
 };
 
+// These games have no dated URL, but each derives its puzzle from the client
+// clock, so the extension can shift the clock inside their frame instead.
+// Chain It (Firestore-backed) and Full Circle Friday (server-fetched) cannot be
+// reached this way and stay on today.
+const CLOCK_SHIM_URLS = new Set([
+  "https://verticle.netlify.app/",
+  "https://foximax.com/",
+  "https://poople.io/",
+  "https://unwordle.org/?daily=1",
+  "https://wafflegame.net/daily",
+  "https://wordsalad.online/",
+]);
+
 const ARCHIVE_STORAGE_KEY = "puzzle-date-archive-date";
 
 const isoToday = () => {
@@ -138,7 +151,7 @@ const isoToday = () => {
 const isArchiveDate = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value) && value < isoToday();
 
-const supportsArchive = (puzzle: Puzzle) => Boolean(ARCHIVE_URLS[puzzle.url]);
+const hasArchiveUrl = (puzzle: Puzzle) => Boolean(ARCHIVE_URLS[puzzle.url]);
 
 const puzzleUrl = (puzzle: Puzzle, date: string) =>
   (date && ARCHIVE_URLS[puzzle.url]?.(date)) || puzzle.url;
@@ -253,6 +266,8 @@ export default function Home() {
   );
   const [customFrameRevision, setCustomFrameRevision] = useState(0);
   const [archiveDate, setArchiveDate] = useState("");
+  const [registeredClockDate, setRegisteredClockDate] = useState<string | null>("");
+  const [clockRevision, setClockRevision] = useState(0);
   const [lookupWord, setLookupWord] = useState("");
   const [lookupTerm, setLookupTerm] = useState("");
   const [lookupStatus, setLookupStatus] = useState<
@@ -266,8 +281,13 @@ export default function Home() {
   const nextPuzzle = orderedPuzzles[activeIndex + 1];
   const nextPuzzleUrl = nextPuzzle && puzzleUrl(nextPuzzle, archiveDate);
   const activePuzzleUrl = puzzleUrl(activePuzzle, archiveDate);
-  const archiveMissing = Boolean(archiveDate) && !supportsArchive(activePuzzle);
   const extensionReady = extensionStatus === "ready";
+  // The clock shim only counts once the extension has confirmed this exact date.
+  const clockShimActive =
+    Boolean(archiveDate) && extensionReady && registeredClockDate === archiveDate;
+  const followsDate = (puzzle: Puzzle) =>
+    hasArchiveUrl(puzzle) || (clockShimActive && CLOCK_SHIM_URLS.has(puzzle.url));
+  const archiveMissing = Boolean(archiveDate) && !followsDate(activePuzzle);
   const extensionHealth = !extensionReady
     ? "missing"
     : extensionVersion === EXPECTED_EXTENSION_VERSION
@@ -614,6 +634,30 @@ export default function Home() {
     else if (saved) window.localStorage.removeItem(ARCHIVE_STORAGE_KEY);
   }, []);
 
+  useEffect(() => {
+    const handleClockResult = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (!detail?.ok) {
+        console.error("Puzzle Date clock shim failed:", detail?.error);
+        setRegisteredClockDate(null);
+        return;
+      }
+      setRegisteredClockDate(typeof detail.date === "string" ? detail.date : null);
+      // Remount the frame only now, so the game reads the shifted clock.
+      setClockRevision((revision) => revision + 1);
+    };
+    window.addEventListener("PUZZLE_DATE_SET_CLOCK_RESULT", handleClockResult);
+    return () =>
+      window.removeEventListener("PUZZLE_DATE_SET_CLOCK_RESULT", handleClockResult);
+  }, []);
+
+  useEffect(() => {
+    if (!extensionReady) return;
+    window.dispatchEvent(
+      new CustomEvent("PUZZLE_DATE_SET_CLOCK", { detail: { date: archiveDate } }),
+    );
+  }, [archiveDate, extensionReady]);
+
   const changeArchiveDate = (value: string) => {
     const next = isArchiveDate(value) ? value : "";
     setArchiveDate(next);
@@ -702,7 +746,9 @@ export default function Home() {
             <span>
               {archiveDate
                 ? archiveMissing
-                  ? "No archive — today's puzzle"
+                  ? CLOCK_SHIM_URLS.has(activePuzzle.url)
+                    ? "Needs the extension for archives"
+                    : "No archive — today's puzzle"
                   : `Archive · ${archiveDate}`
                 : activePuzzle.publisher}
             </span>
@@ -837,14 +883,18 @@ export default function Home() {
             >
               ×
             </button>
-            <p className="eyebrow">Chrome extension · Version 1.0.17</p>
+            <p className="eyebrow">Chrome extension · Version 1.0.18</p>
             <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
             <p>
               Install the extension once to embed supported games and let Puzzle
               Date reset them from inside the app.
             </p>
             <p>
-              Version 1.0.17 makes Start Over reset the puzzle you are actually
+              Version 1.0.18 lets Verticle, FoxiMax, Poople, Unwordle, Waffle,
+              and Word Salad follow the title-bar date picker. They have no
+              archive link, so the extension shifts the clock inside those game
+              frames only, while an earlier day is selected.
+              It also makes Start Over reset the puzzle you are actually
               looking at when the title-bar date picker is set to a past day.
               It keeps the ← and → keys working even while a game
               iframe has keyboard focus, by relaying arrow presses the game
@@ -865,7 +915,7 @@ export default function Home() {
               href="/PuzzleDate/downloads/puzzle-date-game-reset.zip"
               download
             >
-              Download extension 1.0.17
+              Download extension 1.0.18
             </a>
             <div className="extension-guide-steps">
               <section aria-labelledby="new-install-title">
@@ -887,14 +937,14 @@ export default function Home() {
                 <h3 id="update-install-title">Already installed?</h3>
                 <ol>
                   <li>Remove the old Puzzle Date extension in Chrome.</li>
-                  <li>Download and unzip version 1.0.17.</li>
+                  <li>Download and unzip version 1.0.18.</li>
                   <li>Load the new folder, then refresh Puzzle Date.</li>
                 </ol>
               </section>
             </div>
             <p>
               The light beside Extension is red when it is missing, yellow when
-              an update is available, and green when version 1.0.17 is ready.
+              an update is available, and green when version 1.0.18 is ready.
             </p>
             <p className="extension-reset-warning">
               <strong>Custom-game warning:</strong> Start Over clears all local
@@ -1006,7 +1056,7 @@ export default function Home() {
         {activePuzzleCanEmbed && (
           <iframe
             ref={frameRef}
-            key={`${activePuzzleUrl}:${activePuzzle.custom ? customFrameRevision : 0}`}
+            key={`${activePuzzleUrl}:${activePuzzle.custom ? customFrameRevision : 0}:${clockRevision}`}
             className="game-frame active"
             src={activePuzzleUrl}
             title={activePuzzle.name}
@@ -1051,8 +1101,12 @@ export default function Home() {
                 >
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   {puzzle.name}
-                  {archiveDate && !supportsArchive(puzzle) && (
-                    <em className="game-menu-note">today only</em>
+                  {archiveDate && !followsDate(puzzle) && (
+                    <em className="game-menu-note">
+                      {CLOCK_SHIM_URLS.has(puzzle.url)
+                        ? "needs extension"
+                        : "today only"}
+                    </em>
                   )}
                 </button>
               ))}

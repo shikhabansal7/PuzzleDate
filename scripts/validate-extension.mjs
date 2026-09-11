@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.17") fail("release version must be 1.0.17");
+if (manifest.version !== "1.0.18") fail("release version must be 1.0.18");
 if (manifest.content_scripts?.[0]?.run_at !== "document_start") {
   fail("app content script must run at document_start to minimize the frame-policy race");
 }
@@ -174,6 +174,48 @@ for (const required of [
 ]) {
   if (!backgroundSource.includes(required)) {
     fail(`Word 500 archive reset is missing ${required}`);
+  }
+}
+
+for (const required of [
+  "const applyClockShim = (isoDate)",
+  'const marker = "puzzleDateClockShim"',
+  "if (window[marker]) return",
+  "const RealDate = Date",
+  "target.getTime() - startOfToday.getTime()",
+  "ShimDate.prototype = RealDate.prototype",
+  "Object.setPrototypeOf(ShimDate, RealDate)",
+  "window.Date = ShimDate",
+  "chrome.webNavigation.onCommitted.addListener",
+  "injectImmediately: true",
+  "func: applyClockShim",
+  "CLOCK_SHIM_ORIGINS.has(origin)",
+  'message?.type === "SET_PUZZLE_DATE"',
+  "isPastIsoDate(isoDate)",
+  "puzzleDateByTab.delete(tabId)",
+]) {
+  if (!backgroundSource.includes(required)) {
+    fail(`clock shim is missing ${required}`);
+  }
+}
+if (!/chrome\.webNavigation\.onCommitted[\s\S]{0,200}?frameId === 0\) return/.test(backgroundSource)) {
+  fail("clock shim must never run in a top-level frame");
+}
+
+// The shim rewrites Date inside a game, so its origins must be games Puzzle
+// Date already frames — never an arbitrary site.
+const shimOrigins = backgroundSource.match(/const CLOCK_SHIM_ORIGINS = new Set\(\[([\s\S]*?)\]\);/)?.[1];
+if (!shimOrigins) fail("background is missing CLOCK_SHIM_ORIGINS");
+const shimHosts = [...shimOrigins.matchAll(/"(https:\/\/[^"]+)"/g)]
+  .map(([, origin]) => new URL(origin).hostname.replace(/^www\./, ""));
+for (const host of shimHosts) {
+  if (!configuredDomains.includes(host)) {
+    fail(`clock shim origin ${host} is not a configured game domain`);
+  }
+}
+for (const forbidden of ["fullcirclefriday.com", "puzzlitapp.com", "nytimes.com"]) {
+  if (shimHosts.includes(forbidden)) {
+    fail(`${forbidden} does not derive its puzzle from the client clock`);
   }
 }
 
@@ -389,7 +431,7 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.17"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.18"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
@@ -421,8 +463,22 @@ for (const required of [
   "max={isoToday()}",
   "src={activePuzzleUrl}",
   "puzzleUrl(nextPuzzle, archiveDate)",
+  "const CLOCK_SHIM_URLS = new Set",
+  'new CustomEvent("PUZZLE_DATE_SET_CLOCK"',
+  "PUZZLE_DATE_SET_CLOCK_RESULT",
+  "registeredClockDate === archiveDate",
+  "setClockRevision",
 ]) {
   if (!pageSource.includes(required)) fail(`app is missing ${required}`);
+}
+
+// The app and the extension must agree on exactly which games get the shim.
+const appShimUrls = pageSource.match(/const CLOCK_SHIM_URLS = new Set\(\[([\s\S]*?)\]\);/)?.[1];
+if (!appShimUrls) fail("app is missing CLOCK_SHIM_URLS");
+const appShimHosts = [...appShimUrls.matchAll(/"(https:\/\/[^"]+)"/g)]
+  .map(([, url]) => new URL(url).hostname.replace(/^www\./, ""));
+if (!equalSet(appShimHosts, shimHosts)) {
+  fail("app and extension clock-shim games must match exactly");
 }
 if (pageSource.includes("framedPuzzles") || pageSource.includes("game-frame preloaded") || pageSource.includes("(preloaded)")) {
   fail("app must not create a preloaded puzzle iframe");
@@ -437,8 +493,8 @@ for (const [relativePath, source] of [
   ["README.md", await readFile(path.join(projectRoot, "README.md"), "utf8")],
   ["public/extension-install.html", await readFile(path.join(projectRoot, "public", "extension-install.html"), "utf8")],
 ]) {
-  if (!source.includes("Version 1.0.17") && !source.includes("version 1.0.17")) {
-    fail(`${relativePath} must document release 1.0.17`);
+  if (!source.includes("Version 1.0.18") && !source.includes("version 1.0.18")) {
+    fail(`${relativePath} must document release 1.0.18`);
   }
   if (!source.includes("without creating the next iframe")) {
     fail(`${relativePath} must explain timer-safe preload`);
@@ -455,13 +511,18 @@ for (const file of ["background.js", "content.js"]) {
   if (result.status !== 0) fail(`${file} has invalid JavaScript syntax: ${result.stderr}`);
 }
 
-const arrowRelayCheck = spawnSync(
-  process.execPath,
-  [path.join(projectRoot, "scripts", "check-arrow-relay.mjs")],
-  { encoding: "utf8" },
-);
-if (arrowRelayCheck.status !== 0) {
-  fail(`arrow-key relay behaves incorrectly:\n${arrowRelayCheck.stderr || arrowRelayCheck.stdout}`);
+for (const [label, script] of [
+  ["arrow-key relay", "check-arrow-relay.mjs"],
+  ["clock shim", "check-clock-shim.mjs"],
+]) {
+  const result = spawnSync(
+    process.execPath,
+    [path.join(projectRoot, "scripts", script)],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    fail(`${label} behaves incorrectly:\n${result.stderr || result.stdout}`);
+  }
 }
 
 console.log("Extension manifest, rules, scope, domains, headers, and scripts are valid.");

@@ -25,6 +25,7 @@ Deployed as a static site to **GitHub Pages** at `https://shikhabansal7.github.i
 | `chrome-extension/` | MV3 extension source: `manifest.json`, `background.js`, `content.js`, `rules.json`. |
 | `scripts/validate-extension.mjs` | Hard gate. Asserts extension + app source match the audited release contract. |
 | `scripts/check-arrow-relay.mjs` | Behavioral check of the arrow-key relay's guards against a stub DOM. Spawned by the validator. |
+| `scripts/check-clock-shim.mjs` | Replays each clock-derived game's real day formula through the shimmed `Date`. Spawned by the validator. |
 | `scripts/package-extension.mjs` | Validates, then zips the 4 extension files reproducibly into `public/downloads/`. |
 | `public/extension-install.html` | Standalone install/instructions page. |
 | `executions/*.json` | Historical task-plan records for past features. Documentation, not code. |
@@ -134,11 +135,52 @@ This was established by inspecting each game, not assumed:
 | Word 500 | `/game?mode=archive&date=YYYY-MM-DD` | `game-engine.js` `isValidArchiveDate`: `YYYY-MM-DD`, year ≥ 2022, strictly before today |
 | 4 × 3 | `#d=YYYY-MM-DD` | `location.hash` `#d=` branch; keys must exist in `puzzles.json` and be `<= today` |
 
-Not addressable: **Waffle** (archive is in-page JS; `/daily/<n>` redirects to
-`/archive`), **Unwordle** (`?daily=N` is a mode flag — daily=1 and daily=2 render the
-same puzzle), **FoxiMax**, **Verticle**, **Word Salad**, **Chain It**, **Full Circle
-Friday**, **Poople**, and custom games. These stay on today's puzzle and are labelled
-`today only` in the jump menu; the active one shows "No archive — today's puzzle".
+**Six more have no archive URL but derive the puzzle from the client clock**, so the
+extension shifts the clock inside their frame instead (`CLOCK_SHIM_URLS` in the app,
+`CLOCK_SHIM_ORIGINS` in the extension — the validator asserts the two lists match):
+
+| Game | Day formula, read from its shipped source |
+|---|---|
+| Verticle | counts days from `new Date(2022, 0)` |
+| FoxiMax | `Math.floor((Date.now() - tzOffset) / 86400000)` |
+| Poople | counts days from 2025-08-15 via `Date.now()` |
+| Unwordle | `differenceInDays(new Date(), new Date(2022, 0, 19))` |
+| Waffle | number↔date from a `2022-02-13T00:00:00.000Z` epoch |
+| Word Salad | Rust/WASM calls the JS glue's `new Date()` |
+
+**Two genuinely cannot follow the date.** Full Circle Friday fetches its puzzle from
+`fullcirclefriday-e68e27edd409.herokuapp.com` with no date parameter. Chain It reads
+from Firestore and could not be confirmed clock-keyed — it is deliberately excluded
+rather than shimmed on a guess. The validator hard-fails if either origin (or
+nytimes.com) appears in `CLOCK_SHIM_ORIGINS`. Both, plus custom games, stay on today
+and show `today only`.
+
+### How the clock shim works
+
+`applyClockShim(isoDate)` replaces `window.Date` with a subclass-ish wrapper offset by
+a whole number of days. Explicit arguments (`new Date(0)`, `Date.parse`, `Date.UTC`)
+pass through untouched, so saved timestamps are not corrupted; only the zero-argument
+`new Date()` and `Date.now()` move.
+
+- Injected from `chrome.webNavigation.onCommitted` with `injectImmediately: true` —
+  the earliest hook available, so it lands before the game reads the clock. If it ever
+  loses that race the game simply shows today; it fails soft.
+- **Never runs in a top-level frame** (`frameId === 0` returns early) and only for
+  origins in `CLOCK_SHIM_ORIGINS`, only while that tab has a date set. Ordinary
+  browsing of these sites is untouched.
+- Guarded by `window.puzzleDateClockShim`, **not** the `documentElement` dataset — the
+  script can run before `<html>` exists, and a second wrap would compound the offset
+  rather than replace it.
+
+The app tells the extension the date via `PUZZLE_DATE_SET_CLOCK` and waits for
+`PUZZLE_DATE_SET_CLOCK_RESULT` before bumping `clockRevision`, which is part of the
+iframe `key`. **This ordering matters**: the frame must remount only after the
+background knows the date, or the game loads with the real clock. Verified in-browser
+as `told → acked → remounted`.
+
+`scripts/check-clock-shim.mjs` replays each game's real formula through the shimmed
+`Date` and asserts the index moves by exactly the right number of days. It is run by
+`validate-extension`.
 
 `isArchiveDate()` accepts only dates **strictly before today**, because Word 500
 rejects today and later. Picking today clears the setting rather than building a

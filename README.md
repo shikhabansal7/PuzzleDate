@@ -95,20 +95,25 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 ## Share the Chrome extension
 
 Puzzle Date's companion Chrome extension embeds the complete built-in game
-rotation. Version 1.0.17 also registers the hostname of each game added through
+rotation. Version 1.0.18 also registers the hostname of each game added through
 the plus button so that game can embed inside Puzzle Date.
 
-Version 1.0.17 makes **Start Over** reset the puzzle you are actually looking at
+Version 1.0.18 lets six more games follow Puzzle Date's global date picker.
+Verticle, FoxiMax, Poople, Unwordle, Waffle, and Word Salad have no archive URL
+but derive their puzzle from the client clock, so the extension shifts the clock
+inside those game frames only, and only while a past date is selected.
+
+Version 1.0.18 makes **Start Over** reset the puzzle you are actually looking at
 when Puzzle Date's global date picker is set to a past day. Word 500 archive
 puzzles are stored under their own `arc_<lang><level>_<date>_*` keys, so the
 reset now clears those instead of silently wiping the live daily puzzle.
 
-Version 1.0.17 keeps the ← and → keys working while a game iframe holds keyboard
+Version 1.0.18 keeps the ← and → keys working while a game iframe holds keyboard
 focus. A cross-origin game frame swallows key events, so the extension relays
 arrow presses that the game itself does not use back to Puzzle Date. Arrow keys
 the game handles, and arrow keys typed into its inputs, are left alone.
 
-Version 1.0.17 expands audited ad blocking across embedded games, including
+Version 1.0.18 expands audited ad blocking across embedded games, including
 Word 500's verified Raptive and video-ad services and narrow game-specific ad
 paths, only while games are embedded inside Puzzle Date. Next-game preload warms
 network resources without creating the next iframe, so game timers do not start
@@ -124,8 +129,10 @@ all.” Ordinary browsing is unaffected.
 ## Global puzzle date
 
 The title bar has a date picker that switches the whole rotation to an earlier
-day. Only three games expose the puzzle date in their URL, so only these follow
-it:
+day. Nine of the eleven games follow it, by one of two routes.
+
+**Three expose the date in their URL**, so they work with or without the
+extension:
 
 | Game | Archive URL |
 | --- | --- |
@@ -133,10 +140,29 @@ it:
 | Word 500 | `/game?mode=archive&date=YYYY-MM-DD` (past dates only, 2022 onward) |
 | 4 × 3 | `#d=YYYY-MM-DD` (only dates present in the game's `puzzles.json`) |
 
-Waffle has an archive but reaches it through in-page UI rather than a URL.
-FoxiMax, Verticle, Unwordle, Chain It, Word Salad, Full Circle Friday, Poople,
-and games added with the plus button have no addressable archive, so they stay
-on today's puzzle and are labelled **today only** in the jump menu.
+**Six more pick their puzzle from the client clock**, with no archive URL at
+all. For these the extension shifts the clock *inside the game's frame* before
+the game's own scripts run, so it computes the archived puzzle by itself:
+
+| Game | How it picks the day |
+| --- | --- |
+| Verticle | counts days from `new Date(2022, 0)` |
+| FoxiMax | `Date.now() / 86400000` |
+| Poople | counts days from 2025-08-15 |
+| Unwordle | days between `new Date()` and 2022-01-19 |
+| Waffle | puzzle number from a 2022-02-13 epoch |
+| Word Salad | its WASM asks the JS glue for `new Date()` |
+
+These six are labelled **needs extension** in the jump menu until the extension
+confirms the date. Only whole days are shifted, only inside those six origins,
+only while a date is set, and only in framed game pages — never a top-level tab,
+and never ordinary browsing.
+
+**Two cannot follow the date.** Full Circle Friday fetches its puzzle from a
+server with no date parameter, and Chain It reads from Firestore in a way we
+could not confirm is clock-derived; shifting its clock would be a guess. Both
+stay on today's puzzle and are labelled **today only**, as are games added with
+the plus button.
 
 Only dates strictly before today are accepted; picking today clears the setting.
 
@@ -172,17 +198,17 @@ This writes `public/downloads/puzzle-date-game-reset.zip`. To install it:
 5. Refresh Puzzle Date if it was already open.
 
 Chrome does not automatically replace a manually loaded extension. To upgrade
-an existing installation to version 1.0.17:
+an existing installation to version 1.0.18:
 
 1. Download the new ZIP and unzip it to a new folder.
 2. Open `chrome://extensions`.
 3. Remove the old **Puzzle Date Game Reset** card.
 4. Click **Load unpacked** and select the new folder that directly contains
    `manifest.json`.
-5. Refresh Puzzle Date and confirm the extension card shows version 1.0.17.
+5. Refresh Puzzle Date and confirm the extension card shows version 1.0.18.
 
 The light beside Puzzle Date's **Extension** button is red when the extension is
-missing, yellow when it needs an update, and green when version 1.0.17 is ready.
+missing, yellow when it needs an update, and green when version 1.0.18 is ready.
 
 The framing rules are limited to iframe requests initiated by Puzzle Date (or
 localhost during development), to the configured built-in domains and custom

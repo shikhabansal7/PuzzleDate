@@ -74,6 +74,24 @@ window.addEventListener("PUZZLE_DATE_REGISTER_CUSTOM_GAMES", (event) => {
   );
 });
 
+window.addEventListener("PUZZLE_DATE_SET_CLOCK", (event) => {
+  const date = event.detail?.date;
+  if (typeof date !== "string" || (date !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(date))) {
+    window.dispatchEvent(new CustomEvent("PUZZLE_DATE_SET_CLOCK_RESULT", {
+      detail: { ok: false, error: "Puzzle date is invalid." },
+    }));
+    return;
+  }
+  chrome.runtime.sendMessage({ type: "SET_PUZZLE_DATE", date }, (response) => {
+    const error = chrome.runtime.lastError?.message;
+    window.dispatchEvent(new CustomEvent("PUZZLE_DATE_SET_CLOCK_RESULT", {
+      detail: error
+        ? { ok: false, error }
+        : response ?? { ok: false, error: "Puzzle date did not respond." },
+    }));
+  });
+});
+
 window.addEventListener("RESET_ACTIVE_IFRAME", (event) => {
   const strategy = event.detail?.strategy;
   const customReset = strategy === "custom-clear-all";

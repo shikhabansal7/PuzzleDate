@@ -182,6 +182,78 @@ const handleConsentUi = () => {
   }, 12000);
 };
 
+// Games that pick their puzzle purely from the client clock. Each was read
+// from source: Verticle counts days from 2022-01-01, FoxiMax divides Date.now()
+// by 86400000, Poople counts from 2025-08-15, Unwordle diffs against
+// 2022-01-19, Waffle maps its number from a 2022-02-13 epoch, and Word Salad's
+// WASM asks the JS glue for `new Date()`. Shifting the clock inside the frame
+// is the only way to reach their archives, since none expose a date in the URL.
+// Deliberately excluded: Full Circle Friday (fetches its puzzle from a server
+// with no date parameter) and Chain It (Firestore query we could not confirm is
+// clock-keyed).
+const CLOCK_SHIM_ORIGINS = new Set([
+  "https://verticle.netlify.app",
+  "https://foximax.com",
+  "https://poople.io",
+  "https://unwordle.org",
+  "https://wafflegame.net",
+  "https://wordsalad.online",
+]);
+
+const puzzleDateByTab = new Map();
+
+const isPastIsoDate = (value) => {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    return false;
+  }
+  const now = new Date();
+  return parsed.getTime() < Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+};
+
+// Runs in the game frame before its own scripts, so date-derived daily games
+// compute the archived puzzle instead of today's.
+const applyClockShim = (isoDate) => {
+  const marker = "puzzleDateClockShim";
+  // Guard on window, not documentElement: this can run before <html> exists,
+  // and a second wrap would compound the offset instead of replacing it.
+  if (window[marker]) return;
+  window[marker] = isoDate;
+  if (document.documentElement) document.documentElement.dataset[marker] = isoDate;
+
+  const RealDate = Date;
+  const realNow = RealDate.now;
+  const target = new RealDate(`${isoDate}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return;
+
+  // Shift whole days only, so the game keeps a plausible time of day.
+  const real = new RealDate();
+  const startOfToday = new RealDate(
+    real.getFullYear(),
+    real.getMonth(),
+    real.getDate(),
+  );
+  const offset = target.getTime() - startOfToday.getTime();
+  const shiftedNow = () => realNow.call(RealDate) + offset;
+
+  function ShimDate(...args) {
+    if (!new.target) return new RealDate(shiftedNow()).toString();
+    return args.length === 0 ? new RealDate(shiftedNow()) : new RealDate(...args);
+  }
+  ShimDate.prototype = RealDate.prototype;
+  ShimDate.parse = RealDate.parse;
+  ShimDate.UTC = RealDate.UTC;
+  ShimDate.now = shiftedNow;
+  Object.setPrototypeOf(ShimDate, RealDate);
+
+  window.Date = ShimDate;
+};
+
 const forwardArrowKeys = () => {
   const marker = "puzzleDateArrowForwarding";
   if (document.documentElement.dataset[marker] === "true") return;
@@ -475,6 +547,34 @@ const resetCurrentPuzzle = (strategy) => {
 const pendingPoopleDismissals = new Set();
 const pendingConnectionsPlay = new Set();
 
+// onCommitted + injectImmediately is the earliest hook available, so the shim
+// lands before the game reads the clock.
+chrome.webNavigation.onCommitted.addListener(async ({ tabId, frameId, url }) => {
+  if (frameId === 0) return;
+  const isoDate = puzzleDateByTab.get(tabId);
+  if (!isoDate) return;
+
+  let origin;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    return;
+  }
+  if (!CLOCK_SHIM_ORIGINS.has(origin)) return;
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      world: "MAIN",
+      injectImmediately: true,
+      func: applyClockShim,
+      args: [isoDate],
+    });
+  } catch {
+    // The frame can go away mid-navigation; the game just shows today.
+  }
+});
+
 chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId, url }) => {
   if (frameId !== 0) await insertAdBlockCss(tabId, frameId);
 
@@ -550,6 +650,7 @@ chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId, url }) => 
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
+  puzzleDateByTab.delete(tabId);
   const ruleIds = adBlockRuleIdsForTab(tabId);
   if (ruleIds === null) return;
   chrome.declarativeNetRequest
@@ -567,6 +668,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(sendResponse)
       .catch((error) => sendResponse({ ok: false, error: String(error) }));
     return true;
+  }
+
+  if (message?.type === "SET_PUZZLE_DATE") {
+    const isoDate = message.date;
+    if (isoDate === "") {
+      puzzleDateByTab.delete(sender.tab.id);
+      sendResponse({ ok: true, date: "" });
+      return;
+    }
+    if (!isPastIsoDate(isoDate)) {
+      sendResponse({ ok: false, error: "Puzzle date must be an earlier day." });
+      return;
+    }
+    puzzleDateByTab.set(sender.tab.id, isoDate);
+    sendResponse({ ok: true, date: isoDate });
+    return;
   }
 
   if (message?.type === "REGISTER_CUSTOM_GAMES") {
