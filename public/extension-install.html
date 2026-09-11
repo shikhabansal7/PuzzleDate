@@ -110,7 +110,13 @@
         make “Start Over” work for supported games.
       </p>
       <p>
-        Version 1.0.15 expands audited ad blocking across embedded games—including
+        Version 1.0.17 makes “Start Over” reset the puzzle you are actually
+        looking at when Puzzle Date's date picker is set to a past day, instead
+        of clearing the live daily puzzle.
+        It keeps the ← and → keys working while a game iframe holds
+        keyboard focus, by relaying arrow presses the game itself does not use
+        back to Puzzle Date.
+        It expands audited ad blocking across embedded games—including
         Word 500's verified services and narrow game-specific ad paths. Next-game
         preload warms network resources without creating the next iframe, so a
         game's timer does not begin before you reach it. It
@@ -129,7 +135,7 @@
       <p>
         In Puzzle Date, the light beside <strong>Extension</strong> is red when
         the extension is missing, yellow when an update is available, and green
-        when version 1.0.15 is ready.
+        when version 1.0.17 is ready.
       </p>
 
       <h2>Install in Google Chrome</h2>
@@ -146,14 +152,14 @@
 
       <h2>Update an existing installation</h2>
       <ol>
-        <li>Download and unzip the new <strong>version 1.0.15</strong> folder.</li>
+        <li>Download and unzip the new <strong>version 1.0.17</strong> folder.</li>
         <li>Open <code>chrome://extensions</code>.</li>
         <li>
           On the Puzzle Date Game Reset card, click <strong>Remove</strong>, then
           choose <strong>Load unpacked</strong> and select the new folder that
           directly contains <code>manifest.json</code>.
         </li>
-        <li>Refresh Puzzle Date. The extension card should show version 1.0.15.</li>
+        <li>Refresh Puzzle Date. The extension card should show version 1.0.17.</li>
       </ol>
 
       <h2>What “Start Over” resets</h2>

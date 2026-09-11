@@ -156,6 +156,36 @@ h1 {
   color: var(--green);
 }
 
+.date-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-control input {
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.date-control input:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
+.game-menu-note {
+  margin-left: auto;
+  color: #8b8d86;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .add-game-button {
   width: 34px;
   height: 34px;
@@ -406,6 +436,147 @@ h1 {
   font-size: 11px;
 }
 
+.stage {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.lookup {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.lookup label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6f716b;
+}
+
+.lookup-field {
+  display: flex;
+  gap: 6px;
+}
+
+.lookup-field input {
+  min-width: 0;
+  flex: 1;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.lookup-field input:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
+.lookup-field button {
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--green);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.lookup-results {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.lookup-hint {
+  margin: 0;
+  color: #6f716b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.lookup-hint--error {
+  color: #a33b32;
+}
+
+.lookup-entry h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.lookup-entry + .lookup-entry {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.lookup-phonetic {
+  margin: 2px 0 0;
+  color: #6f716b;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.lookup-part {
+  margin: 12px 0 4px;
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.lookup-meaning ol {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.lookup-meaning li + li {
+  margin-top: 6px;
+}
+
+.lookup-example {
+  display: block;
+  margin-top: 2px;
+  color: #6f716b;
+  font-style: italic;
+}
+
+.lookup-google {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.lookup-google:hover,
+.lookup-google:focus-visible {
+  border-bottom-color: var(--green);
+}
+
 .frame-wrap {
   position: relative;
   min-height: 0;
@@ -649,9 +820,42 @@ iframe {
 
 @media (max-width: 680px) {
   .app-shell {
-    grid-template-rows: 62px minmax(0, 1fr) 68px;
+    grid-template-rows: auto minmax(0, 1fr) 68px;
     padding: 8px;
     gap: 8px;
+  }
+
+  /* One row cannot hold the title and the date control at this width, so the
+     actions wrap onto their own line instead of overlapping the title. */
+  .topbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 8px;
+    column-gap: 10px;
+    padding: 9px 10px;
+  }
+
+  .header-actions {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  /* No room for a side column, so the lookup becomes a short strip on top. */
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .lookup {
+    max-height: 40dvh;
+    padding: 10px 12px;
+    border-radius: 13px;
+  }
+
+  .lookup label {
+    margin-bottom: 5px;
   }
 
   .topbar,
@@ -667,10 +871,14 @@ iframe {
   }
 
   .brand .eyebrow,
-  .puzzle-title span:last-child,
   .shortcut,
   .button-label {
     display: none;
+  }
+
+  .date-control input {
+    padding: 5px 6px;
+    font-size: 9px;
   }
 
   h1 {
@@ -683,6 +891,11 @@ iframe {
 
   .puzzle-title strong {
     font-size: 14px;
+  }
+
+  /* Kept on mobile so the archive date stays visible; the wordmark went instead. */
+  .puzzle-title span:last-child {
+    font-size: 9px;
   }
 
   .open-link {

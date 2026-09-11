@@ -182,6 +182,37 @@ const handleConsentUi = () => {
   }, 12000);
 };
 
+const forwardArrowKeys = () => {
+  const marker = "puzzleDateArrowForwarding";
+  if (document.documentElement.dataset[marker] === "true") return;
+  document.documentElement.dataset[marker] = "true";
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    // The game handled the key itself, so Puzzle Date must not also navigate.
+    if (event.defaultPrevented) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        target.matches("input, textarea, select"))
+    ) {
+      return;
+    }
+
+    window.parent.postMessage(
+      {
+        source: "puzzle-date-extension",
+        type: "PUZZLE_DATE_ARROW_KEY",
+        key: event.key,
+      },
+      "*",
+    );
+  });
+};
+
 const adBlockRuleIdsForTab = (tabId) => {
   if (!Number.isInteger(tabId) || tabId < 0 || tabId > MAX_AD_BLOCK_TAB_ID) return null;
   const firstRuleId = AD_BLOCK_RULE_ID_BASE + tabId * AD_BLOCK_RULES_PER_TAB;
@@ -212,6 +243,11 @@ const insertAdBlockCss = async (tabId, frameId) => {
       target: { tabId, frameIds: [frameId] },
       world: "MAIN",
       func: handleConsentUi,
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      world: "MAIN",
+      func: forwardArrowKeys,
     });
   } catch {
     // Some browser-internal or otherwise restricted child frames cannot be styled.
@@ -383,7 +419,16 @@ const resetCurrentPuzzle = (strategy) => {
     if (!isSanePart(language) || !isSanePart(level)) {
       return { ok: false, error: "Word 500 language or level is invalid." };
     }
-    const prefix = `${language}${level}`;
+    // Archive puzzles keep their own arc_<lang><level>_<date>_* keys, so a
+    // reset there must not clear the live daily puzzle instead.
+    const params = new URLSearchParams(window.location.search);
+    const archiveDate = params.get("date");
+    const prefix =
+      params.get("mode") === "archive" &&
+      typeof archiveDate === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(archiveDate)
+        ? `arc_${language}${level}_${archiveDate}_`
+        : `${language}${level}`;
     localStorage.removeItem(`${prefix}hints`);
     localStorage.removeItem(`${prefix}gameover`);
     for (let index = 0; index < 8; index += 1) {

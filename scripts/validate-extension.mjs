@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.15") fail("release version must be 1.0.15");
+if (manifest.version !== "1.0.17") fail("release version must be 1.0.17");
 if (manifest.content_scripts?.[0]?.run_at !== "document_start") {
   fail("app content script must run at document_start to minimize the frame-policy race");
 }
@@ -146,6 +146,47 @@ for (const required of [
 if (/document\.querySelector(?:All)?\(\s*[`'"]button(?:\b|[.#[:])/i.test(backgroundSource)) {
   fail("Connections Play recovery must not query broad button selectors");
 }
+for (const required of [
+  "const forwardArrowKeys = ()",
+  'const marker = "puzzleDateArrowForwarding"',
+  'event.key !== "ArrowLeft" && event.key !== "ArrowRight"',
+  "if (event.defaultPrevented) return",
+  "event.altKey || event.ctrlKey || event.metaKey || event.shiftKey",
+  "target.isContentEditable",
+  'target.matches("input, textarea, select")',
+  "window.parent.postMessage",
+  'source: "puzzle-date-extension"',
+  'type: "PUZZLE_DATE_ARROW_KEY"',
+  "func: forwardArrowKeys",
+]) {
+  if (!backgroundSource.includes(required)) {
+    fail(`arrow-key relay is missing ${required}`);
+  }
+}
+if (/forwardArrowKeys[\s\S]*?window\.parent\.postMessage[\s\S]{0,200}?key: event\.key/.test(backgroundSource) === false) {
+  fail("arrow-key relay must forward only the pressed arrow key");
+}
+
+for (const required of [
+  'params.get("mode") === "archive"',
+  "`arc_${language}${level}_${archiveDate}_`",
+  "/^\\d{4}-\\d{2}-\\d{2}$/.test(archiveDate)",
+]) {
+  if (!backgroundSource.includes(required)) {
+    fail(`Word 500 archive reset is missing ${required}`);
+  }
+}
+
+// Every archive URL the app can point a frame at must stay on that game's
+// already-approved origin, or the reset origin checks would reject it.
+const archiveUrls = pageSource.match(/const ARCHIVE_URLS[\s\S]*?\n\};/)?.[0];
+if (!archiveUrls) fail("app is missing the ARCHIVE_URLS map");
+for (const [, origin] of archiveUrls.matchAll(/`(https:\/\/[^/`$]+)/g)) {
+  if (!configuredDomains.includes(new URL(origin).hostname.replace(/^www\./, ""))) {
+    fail(`archive URL ${origin} is not a configured game domain`);
+  }
+}
+
 const readStringArray = (source, constantName) => {
   const body = source.match(new RegExp(`const ${constantName} = \\[([\\s\\S]*?)\\n\\];`))?.[1];
   if (!body) fail(`background is missing ${constantName}`);
@@ -348,7 +389,7 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.15"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.17"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
@@ -365,6 +406,21 @@ for (const required of [
   'link.as = as',
   'return () => hints.forEach((link) => link.remove())',
   '["http:", "https:"].includes(nextUrl.protocol)',
+  "const frameRef = useRef<HTMLIFrameElement>(null)",
+  "ref={frameRef}",
+  'window.addEventListener("message", handleFrameArrowKey)',
+  "event.source !== frameRef.current?.contentWindow",
+  'message?.source !== "puzzle-date-extension"',
+  'message.type !== "PUZZLE_DATE_ARROW_KEY"',
+  'message.key === "ArrowLeft"',
+  'message.key === "ArrowRight"',
+  'window.removeEventListener("message", handleFrameArrowKey)',
+  'const ARCHIVE_STORAGE_KEY = "puzzle-date-archive-date"',
+  "value < isoToday()",
+  'type="date"',
+  "max={isoToday()}",
+  "src={activePuzzleUrl}",
+  "puzzleUrl(nextPuzzle, archiveDate)",
 ]) {
   if (!pageSource.includes(required)) fail(`app is missing ${required}`);
 }
@@ -381,8 +437,8 @@ for (const [relativePath, source] of [
   ["README.md", await readFile(path.join(projectRoot, "README.md"), "utf8")],
   ["public/extension-install.html", await readFile(path.join(projectRoot, "public", "extension-install.html"), "utf8")],
 ]) {
-  if (!source.includes("Version 1.0.15") && !source.includes("version 1.0.15")) {
-    fail(`${relativePath} must document release 1.0.15`);
+  if (!source.includes("Version 1.0.17") && !source.includes("version 1.0.17")) {
+    fail(`${relativePath} must document release 1.0.17`);
   }
   if (!source.includes("without creating the next iframe")) {
     fail(`${relativePath} must explain timer-safe preload`);
@@ -397,6 +453,15 @@ for (const file of ["background.js", "content.js"]) {
     encoding: "utf8",
   });
   if (result.status !== 0) fail(`${file} has invalid JavaScript syntax: ${result.stderr}`);
+}
+
+const arrowRelayCheck = spawnSync(
+  process.execPath,
+  [path.join(projectRoot, "scripts", "check-arrow-relay.mjs")],
+  { encoding: "utf8" },
+);
+if (arrowRelayCheck.status !== 0) {
+  fail(`arrow-key relay behaves incorrectly:\n${arrowRelayCheck.stderr || arrowRelayCheck.stdout}`);
 }
 
 console.log("Extension manifest, rules, scope, domains, headers, and scripts are valid.");

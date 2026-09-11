@@ -23,7 +23,7 @@ type ResetStrategy =
   | "poople-current"
   | "custom-clear-all";
 
-const EXPECTED_EXTENSION_VERSION = "1.0.15";
+const EXPECTED_EXTENSION_VERSION = "1.0.17";
 
 const validExtensionVersion = (value: unknown) =>
   typeof value === "string" && /^\d+\.\d+\.\d+$/.test(value)
@@ -111,6 +111,38 @@ const puzzles: Puzzle[] = [
   },
 ];
 
+// Only these games expose the puzzle date in their URL. Everything else in the
+// rotation either has no archive or reaches it through in-page UI we cannot
+// address, so a global date deliberately leaves them on today's puzzle.
+const ARCHIVE_URLS: Record<string, (date: string) => string> = {
+  "https://www.nytimes.com/games/connections": (date) =>
+    `https://www.nytimes.com/games/connections/${date}`,
+  "https://word500.com/game?mode=daily": (date) =>
+    `https://word500.com/game?mode=archive&date=${date}`,
+  "https://www.hankgreen.com/fourbythree/": (date) =>
+    `https://www.hankgreen.com/fourbythree/#d=${date}`,
+};
+
+const ARCHIVE_STORAGE_KEY = "puzzle-date-archive-date";
+
+const isoToday = () => {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+};
+
+// Word 500 rejects today and anything later, so "today" always means live play.
+const isArchiveDate = (value: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value) && value < isoToday();
+
+const supportsArchive = (puzzle: Puzzle) => Boolean(ARCHIVE_URLS[puzzle.url]);
+
+const puzzleUrl = (puzzle: Puzzle, date: string) =>
+  (date && ARCHIVE_URLS[puzzle.url]?.(date)) || puzzle.url;
+
 const puzzlesForDay = (day: number) =>
   puzzles.filter((puzzle) => !puzzle.saturdayOnly || day === 6);
 
@@ -143,6 +175,51 @@ const normalizeCustomHosts = (value: unknown) => {
   return [...new Set(hostnames)].sort();
 };
 
+type DictionarySense = {
+  partOfSpeech: string;
+  definitions: Array<{ definition: string; example?: string }>;
+};
+
+// Wiktionary returns definitions as HTML fragments, so they are flattened to
+// text. DOMParser documents are inert, so nothing here can execute or reach
+// the live page.
+const plainText = (html: string) =>
+  new DOMParser()
+    .parseFromString(html, "text/html")
+    .body.textContent?.replace(/\s+/g, " ")
+    .trim() ?? "";
+
+const readEnglishSenses = (payload: unknown): DictionarySense[] => {
+  const english = (payload as Record<string, unknown> | null)?.en;
+  if (!Array.isArray(english)) return [];
+
+  return english.flatMap((sense) => {
+    const partOfSpeech = plainText(String(sense?.partOfSpeech ?? ""));
+    const rawDefinitions: unknown[] = Array.isArray(sense?.definitions)
+      ? sense.definitions
+      : [];
+
+    const definitions = rawDefinitions.flatMap((raw) => {
+      const entry = raw as { definition?: unknown; examples?: unknown };
+      const definition = plainText(String(entry?.definition ?? ""));
+      if (!definition) return [];
+      const example = Array.isArray(entry?.examples)
+        ? plainText(String(entry.examples[0] ?? ""))
+        : "";
+      return [{ definition, example: example || undefined }];
+    });
+
+    if (!partOfSpeech || definitions.length === 0) return [];
+    return [{ partOfSpeech, definitions }];
+  });
+};
+
+const DICTIONARY_ENDPOINT =
+  "https://en.wiktionary.org/api/rest_v1/page/definition/";
+
+const googleSearchUrl = (word: string) =>
+  `https://www.google.com/search?q=${encodeURIComponent(`define ${word}`)}`;
+
 const shuffle = (items: Puzzle[]) => {
   const shuffled = [...items];
 
@@ -159,6 +236,7 @@ const shuffle = (items: Puzzle[]) => {
 
 export default function Home() {
   const appShellRef = useRef<HTMLElement>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
   const [orderedPuzzles, setOrderedPuzzles] = useState(defaultPuzzles);
   const [customPuzzles, setCustomPuzzles] = useState<Puzzle[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -174,10 +252,21 @@ export default function Home() {
     new Set(),
   );
   const [customFrameRevision, setCustomFrameRevision] = useState(0);
+  const [archiveDate, setArchiveDate] = useState("");
+  const [lookupWord, setLookupWord] = useState("");
+  const [lookupTerm, setLookupTerm] = useState("");
+  const [lookupStatus, setLookupStatus] = useState<
+    "idle" | "loading" | "done" | "error"
+  >("idle");
+  const [lookupSenses, setLookupSenses] = useState<DictionarySense[]>([]);
+  const [lookupError, setLookupError] = useState("");
+  const lookupRequestRef = useRef<AbortController | null>(null);
   const pendingCustomHostsRef = useRef<string[]>([]);
   const activePuzzle = orderedPuzzles[activeIndex];
   const nextPuzzle = orderedPuzzles[activeIndex + 1];
-  const nextPuzzleUrl = nextPuzzle?.url;
+  const nextPuzzleUrl = nextPuzzle && puzzleUrl(nextPuzzle, archiveDate);
+  const activePuzzleUrl = puzzleUrl(activePuzzle, archiveDate);
+  const archiveMissing = Boolean(archiveDate) && !supportsArchive(activePuzzle);
   const extensionReady = extensionStatus === "ready";
   const extensionHealth = !extensionReady
     ? "missing"
@@ -230,9 +319,9 @@ export default function Home() {
     return () => hints.forEach((link) => link.remove());
   }, [nextPuzzleUrl]);
 
-  const openInNewTab = useCallback((puzzle: Puzzle) => {
+  const openInNewTab = useCallback((url: string) => {
     const link = document.createElement("a");
-    link.href = puzzle.url;
+    link.href = url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     document.body.appendChild(link);
@@ -395,10 +484,10 @@ export default function Home() {
         nextPuzzle.canEmbed === false &&
         extensionStatus !== "ready"
       ) {
-        openInNewTab(nextPuzzle);
+        openInNewTab(puzzleUrl(nextPuzzle, archiveDate));
       }
     },
-    [extensionStatus, openInNewTab, orderedPuzzles],
+    [archiveDate, extensionStatus, openInNewTab, orderedPuzzles],
   );
 
   const goPrevious = useCallback(() => {
@@ -426,6 +515,28 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goNext, goPrevious]);
 
+  // A focused cross-origin game frame swallows arrow keys, so the extension
+  // relays the unhandled ones back to Puzzle Date.
+  useEffect(() => {
+    const handleFrameArrowKey = (event: MessageEvent) => {
+      if (event.source !== frameRef.current?.contentWindow) return;
+      const message = event.data as
+        | { source?: unknown; type?: unknown; key?: unknown }
+        | null;
+      if (
+        message?.source !== "puzzle-date-extension" ||
+        message.type !== "PUZZLE_DATE_ARROW_KEY"
+      ) {
+        return;
+      }
+      if (message.key === "ArrowLeft") goPrevious();
+      if (message.key === "ArrowRight") goNext();
+    };
+
+    window.addEventListener("message", handleFrameArrowKey);
+    return () => window.removeEventListener("message", handleFrameArrowKey);
+  }, [goNext, goPrevious]);
+
   const reloadGame = () => {
     if (extensionStatus !== "ready") {
       setShowExtensionGuide(true);
@@ -450,6 +561,64 @@ export default function Home() {
       "puzzle-date-order",
       JSON.stringify(nextOrder.map(({ url }) => url)),
     );
+  };
+
+  const lookUpWord = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const word = lookupWord.trim();
+    if (!word) return;
+
+    lookupRequestRef.current?.abort();
+    const request = new AbortController();
+    lookupRequestRef.current = request;
+
+    setLookupTerm(word);
+    setLookupStatus("loading");
+    setLookupError("");
+    setLookupSenses([]);
+
+    try {
+      const response = await fetch(
+        `${DICTIONARY_ENDPOINT}${encodeURIComponent(word)}`,
+        { signal: request.signal },
+      );
+      if (response.status === 404) {
+        setLookupStatus("error");
+        setLookupError(`No English entry for “${word}”.`);
+        return;
+      }
+      if (!response.ok) throw new Error(`status ${response.status}`);
+
+      const senses = readEnglishSenses(await response.json());
+      if (senses.length === 0) {
+        setLookupStatus("error");
+        setLookupError(`No English entry for “${word}”.`);
+        return;
+      }
+
+      setLookupSenses(senses);
+      setLookupStatus("done");
+    } catch (error) {
+      if ((error as Error)?.name === "AbortError") return;
+      setLookupStatus("error");
+      setLookupError("Lookup failed. Check your connection, or try Google.");
+    }
+  };
+
+  useEffect(() => () => lookupRequestRef.current?.abort(), []);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(ARCHIVE_STORAGE_KEY) ?? "";
+    // A stored date goes stale the moment it stops being in the past.
+    if (isArchiveDate(saved)) setArchiveDate(saved);
+    else if (saved) window.localStorage.removeItem(ARCHIVE_STORAGE_KEY);
+  }, []);
+
+  const changeArchiveDate = (value: string) => {
+    const next = isArchiveDate(value) ? value : "";
+    setArchiveDate(next);
+    if (next) window.localStorage.setItem(ARCHIVE_STORAGE_KEY, next);
+    else window.localStorage.removeItem(ARCHIVE_STORAGE_KEY);
   };
 
   const addCustomGame = (event: React.FormEvent<HTMLFormElement>) => {
@@ -490,7 +659,7 @@ export default function Home() {
       setCustomPuzzles(nextCustomPuzzles);
       setOrderedPuzzles(nextOrder);
       setActiveIndex(nextOrder.length - 1);
-      if (!extensionReady) openInNewTab(newPuzzle);
+      if (!extensionReady) openInNewTab(newPuzzle.url);
       window.localStorage.setItem(
         "puzzle-date-custom-games",
         JSON.stringify(
@@ -530,11 +699,39 @@ export default function Home() {
           />
           <div>
             <strong>{activePuzzle.name}</strong>
-            <span>{activePuzzle.publisher}</span>
+            <span>
+              {archiveDate
+                ? archiveMissing
+                  ? "No archive — today's puzzle"
+                  : `Archive · ${archiveDate}`
+                : activePuzzle.publisher}
+            </span>
           </div>
         </div>
 
         <div className="header-actions">
+          <div className="date-control">
+            <label className="visually-hidden" htmlFor="archive-date">
+              Puzzle date
+            </label>
+            <input
+              id="archive-date"
+              type="date"
+              max={isoToday()}
+              value={archiveDate}
+              onChange={(event) => changeArchiveDate(event.target.value)}
+              title="Play an earlier day's puzzles"
+            />
+            {archiveDate && (
+              <button
+                className="utility-button"
+                type="button"
+                onClick={() => changeArchiveDate("")}
+              >
+                Today
+              </button>
+            )}
+          </div>
           <button className="utility-button" type="button" onClick={shuffleRest}>
             Shuffle rest
           </button>
@@ -640,14 +837,19 @@ export default function Home() {
             >
               ×
             </button>
-            <p className="eyebrow">Chrome extension · Version 1.0.15</p>
+            <p className="eyebrow">Chrome extension · Version 1.0.17</p>
             <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
             <p>
               Install the extension once to embed supported games and let Puzzle
               Date reset them from inside the app.
             </p>
             <p>
-              Version 1.0.15 expands audited ad blocking across the embedded games,
+              Version 1.0.17 makes Start Over reset the puzzle you are actually
+              looking at when the title-bar date picker is set to a past day.
+              It keeps the ← and → keys working even while a game
+              iframe has keyboard focus, by relaying arrow presses the game
+              itself does not use back to Puzzle Date.
+              It expands audited ad blocking across the embedded games,
               including verified Word 500 services and narrow game-specific ad paths.
               Next-game preload now warms network resources without creating the next
               iframe, so timers do not begin before you reach a game. It also reopens Connections automatically after Start Over
@@ -663,7 +865,7 @@ export default function Home() {
               href="/PuzzleDate/downloads/puzzle-date-game-reset.zip"
               download
             >
-              Download extension 1.0.15
+              Download extension 1.0.17
             </a>
             <div className="extension-guide-steps">
               <section aria-labelledby="new-install-title">
@@ -685,14 +887,14 @@ export default function Home() {
                 <h3 id="update-install-title">Already installed?</h3>
                 <ol>
                   <li>Remove the old Puzzle Date extension in Chrome.</li>
-                  <li>Download and unzip version 1.0.15.</li>
+                  <li>Download and unzip version 1.0.17.</li>
                   <li>Load the new folder, then refresh Puzzle Date.</li>
                 </ol>
               </section>
             </div>
             <p>
               The light beside Extension is red when it is missing, yellow when
-              an update is available, and green when version 1.0.15 is ready.
+              an update is available, and green when version 1.0.17 is ready.
             </p>
             <p className="extension-reset-warning">
               <strong>Custom-game warning:</strong> Start Over clears all local
@@ -709,7 +911,80 @@ export default function Home() {
         </div>
       )}
 
-      <section className="frame-wrap" aria-label={`${activePuzzle.name} puzzle`}>
+      <div className="stage">
+        {/* ponytail: always-on panel. Add a collapse toggle if it crowds the games. */}
+        <aside className="lookup" aria-label="Word lookup">
+          <form onSubmit={lookUpWord}>
+            <label htmlFor="lookup-word">Look up a word</label>
+            <div className="lookup-field">
+              <input
+                id="lookup-word"
+                type="search"
+                autoComplete="off"
+                placeholder="e.g. cleave"
+                value={lookupWord}
+                onChange={(event) => setLookupWord(event.target.value)}
+              />
+              <button type="submit" aria-label="Look up word">
+                →
+              </button>
+            </div>
+          </form>
+
+          <div className="lookup-results" aria-live="polite">
+            {lookupStatus === "idle" && (
+              <p className="lookup-hint">
+                Definitions appear here without leaving your game.
+              </p>
+            )}
+            {lookupStatus === "loading" && (
+              <p className="lookup-hint">Looking up “{lookupTerm}”…</p>
+            )}
+            {lookupStatus === "error" && (
+              <p className="lookup-hint lookup-hint--error">{lookupError}</p>
+            )}
+            {lookupStatus === "done" && (
+              <article className="lookup-entry">
+                <h3>{lookupTerm}</h3>
+                {lookupSenses.map((sense, senseIndex) => (
+                  <div
+                    className="lookup-meaning"
+                    key={`${sense.partOfSpeech}-${senseIndex}`}
+                  >
+                    <p className="lookup-part">{sense.partOfSpeech}</p>
+                    <ol>
+                      {sense.definitions
+                        .slice(0, 3)
+                        .map(({ definition, example }, index) => (
+                          <li key={`${index}-${definition.slice(0, 24)}`}>
+                            {definition}
+                            {example && (
+                              <span className="lookup-example">
+                                “{example}”
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                    </ol>
+                  </div>
+                ))}
+              </article>
+            )}
+          </div>
+
+          {lookupTerm && (
+            <a
+              className="lookup-google"
+              href={googleSearchUrl(lookupTerm)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Search Google for “{lookupTerm}” <span aria-hidden="true">↗</span>
+            </a>
+          )}
+        </aside>
+
+        <section className="frame-wrap" aria-label={`${activePuzzle.name} puzzle`}>
         {!activePuzzleCanEmbed && (
           <div className="external-game">
             <span
@@ -723,16 +998,17 @@ export default function Home() {
               This game does not allow embedding. Playing it on its own site
               also gives it the best chance to keep your progress.
             </p>
-            <a href={activePuzzle.url} target="_blank" rel="noreferrer">
+            <a href={activePuzzleUrl} target="_blank" rel="noreferrer">
               Open {activePuzzle.name} <span aria-hidden="true">↗</span>
             </a>
           </div>
         )}
         {activePuzzleCanEmbed && (
           <iframe
-            key={`${activePuzzle.url}:${activePuzzle.custom ? customFrameRevision : 0}`}
+            ref={frameRef}
+            key={`${activePuzzleUrl}:${activePuzzle.custom ? customFrameRevision : 0}`}
             className="game-frame active"
-            src={activePuzzle.url}
+            src={activePuzzleUrl}
             title={activePuzzle.name}
             loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
@@ -742,7 +1018,8 @@ export default function Home() {
             onPointerLeave={() => appShellRef.current?.focus()}
           />
         )}
-      </section>
+        </section>
+      </div>
 
       <nav
         className="controls"
@@ -760,7 +1037,9 @@ export default function Home() {
 
         <div className="progress">
           <div className="game-menu" aria-label="Choose a game">
-            <p className="game-menu-title">Jump to a game</p>
+            <p className="game-menu-title">
+              {archiveDate ? `Archive · ${archiveDate}` : "Jump to a game"}
+            </p>
             <div className="game-menu-list">
               {orderedPuzzles.map((puzzle, index) => (
                 <button
@@ -772,6 +1051,9 @@ export default function Home() {
                 >
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   {puzzle.name}
+                  {archiveDate && !supportsArchive(puzzle) && (
+                    <em className="game-menu-note">today only</em>
+                  )}
                 </button>
               ))}
             </div>
