@@ -345,6 +345,32 @@ const forwardArrowKeys = () => {
   });
 };
 
+// A cross-origin frame's selection is invisible to Puzzle Date, so the word the
+// player highlighted is relayed out on right-click.
+const forwardLookupSelection = () => {
+  const marker = "puzzleDateLookupSelection";
+  if (document.documentElement?.dataset[marker] === "true") return;
+  if (document.documentElement) document.documentElement.dataset[marker] = "true";
+
+  window.addEventListener("contextmenu", (event) => {
+    const selected = window.getSelection()?.toString() ?? "";
+    // Collapse runs of whitespace so a multi-line drag still reads as a phrase.
+    const text = selected.replace(/\s+/g, " ").trim();
+    if (!text || text.length > 60) return;
+
+    // Only take over the menu when there is really something to look up.
+    event.preventDefault();
+    window.parent.postMessage(
+      {
+        source: "puzzle-date-extension",
+        type: "PUZZLE_DATE_LOOKUP_SELECTION",
+        text,
+      },
+      "*",
+    );
+  });
+};
+
 const adBlockRuleIdsForTab = (tabId) => {
   if (!Number.isInteger(tabId) || tabId < 0 || tabId > MAX_AD_BLOCK_TAB_ID) return null;
   const firstRuleId = AD_BLOCK_RULE_ID_BASE + tabId * AD_BLOCK_RULES_PER_TAB;
@@ -380,6 +406,11 @@ const insertAdBlockCss = async (tabId, frameId) => {
       target: { tabId, frameIds: [frameId] },
       world: "MAIN",
       func: forwardArrowKeys,
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      world: "MAIN",
+      func: forwardLookupSelection,
     });
   } catch {
     // Some browser-internal or otherwise restricted child frames cannot be styled.

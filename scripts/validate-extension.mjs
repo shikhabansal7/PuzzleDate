@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.19") fail("release version must be 1.0.19");
+if (manifest.version !== "1.0.20") fail("release version must be 1.0.20");
 if (manifest.content_scripts?.[0]?.run_at !== "document_start") {
   fail("app content script must run at document_start to minimize the frame-policy race");
 }
@@ -175,6 +175,24 @@ for (const required of [
   if (!backgroundSource.includes(required)) {
     fail(`Word 500 archive reset is missing ${required}`);
   }
+}
+
+for (const required of [
+  "const forwardLookupSelection = ()",
+  'const marker = "puzzleDateLookupSelection"',
+  'window.addEventListener("contextmenu"',
+  "window.getSelection()?.toString()",
+  "text.length > 60",
+  'type: "PUZZLE_DATE_LOOKUP_SELECTION"',
+  "func: forwardLookupSelection",
+]) {
+  if (!backgroundSource.includes(required)) {
+    fail(`selection lookup relay is missing ${required}`);
+  }
+}
+// An empty selection must leave the browser's own menu alone.
+if (!/if \(!text \|\| text\.length > 60\) return;[\s\S]{0,200}?event\.preventDefault\(\)/.test(backgroundSource)) {
+  fail("selection lookup must only suppress the context menu when text is selected");
 }
 
 for (const required of [
@@ -507,7 +525,7 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.19"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.20"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
@@ -529,7 +547,7 @@ for (const required of [
   'window.addEventListener("message", handleFrameArrowKey)',
   "event.source !== frameRef.current?.contentWindow",
   'message?.source !== "puzzle-date-extension"',
-  'message.type !== "PUZZLE_DATE_ARROW_KEY"',
+  'message.type === "PUZZLE_DATE_ARROW_KEY"',
   'message.key === "ArrowLeft"',
   'message.key === "ArrowRight"',
   'window.removeEventListener("message", handleFrameArrowKey)',
@@ -544,6 +562,12 @@ for (const required of [
   "PUZZLE_DATE_SET_CLOCK_RESULT",
   "registeredClockDate === archiveDate",
   "setClockRevision",
+  'const LOOKUP_COLLAPSED_KEY = "puzzle-date-lookup-collapsed"',
+  'message.type === "PUZZLE_DATE_LOOKUP_SELECTION"',
+  "runLookup(text)",
+  "setLookupCollapsed",
+  "aria-expanded={!lookupCollapsed}",
+  "hidden={lookupCollapsed}",
 ]) {
   if (!pageSource.includes(required)) fail(`app is missing ${required}`);
 }
@@ -569,8 +593,8 @@ for (const [relativePath, source] of [
   ["README.md", await readFile(path.join(projectRoot, "README.md"), "utf8")],
   ["public/extension-install.html", await readFile(path.join(projectRoot, "public", "extension-install.html"), "utf8")],
 ]) {
-  if (!source.includes("Version 1.0.19") && !source.includes("version 1.0.19")) {
-    fail(`${relativePath} must document release 1.0.19`);
+  if (!source.includes("Version 1.0.20") && !source.includes("version 1.0.20")) {
+    fail(`${relativePath} must document release 1.0.20`);
   }
   if (!source.includes("without creating the next iframe")) {
     fail(`${relativePath} must explain timer-safe preload`);
@@ -591,6 +615,7 @@ for (const [label, script] of [
   ["arrow-key relay", "check-arrow-relay.mjs"],
   ["clock shim", "check-clock-shim.mjs"],
   ["ad coverage", "check-ad-coverage.mjs"],
+  ["selection lookup", "check-lookup-selection.mjs"],
 ]) {
   const result = spawnSync(
     process.execPath,

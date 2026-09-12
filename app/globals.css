@@ -443,6 +443,10 @@ h1 {
   gap: 12px;
 }
 
+.stage:has(.lookup[data-collapsed]) {
+  grid-template-columns: 38px minmax(0, 1fr);
+}
+
 .lookup {
   min-height: 0;
   display: flex;
@@ -452,6 +456,53 @@ h1 {
   background: var(--cream);
   border: 1px solid var(--line);
   border-radius: 18px;
+}
+
+.lookup[data-collapsed] {
+  padding: 10px 0;
+  align-items: center;
+}
+
+.lookup-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #6f716b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lookup-toggle:hover,
+.lookup-toggle:focus-visible {
+  color: var(--green);
+}
+
+.lookup[data-collapsed] .lookup-toggle {
+  flex-direction: column-reverse;
+  gap: 12px;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+/* Vertical label so the collapsed rail stays readable. */
+.lookup[data-collapsed] .lookup-toggle-label {
+  writing-mode: vertical-rl;
+  letter-spacing: 0.16em;
+}
+
+.lookup-body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .lookup label {
@@ -852,6 +903,29 @@ iframe {
     max-height: 40dvh;
     padding: 10px 12px;
     border-radius: 13px;
+  }
+
+  /* Stacked layout, so collapsing shrinks the strip's height, not its width. */
+  .stage:has(.lookup[data-collapsed]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lookup[data-collapsed] {
+    max-height: none;
+    padding: 8px 12px;
+    align-items: stretch;
+  }
+
+  .lookup[data-collapsed] .lookup-toggle {
+    flex-direction: row;
+    gap: 8px;
+    height: auto;
+    justify-content: space-between;
+  }
+
+  .lookup[data-collapsed] .lookup-toggle-label {
+    writing-mode: horizontal-tb;
+    letter-spacing: 0.12em;
   }
 
   .lookup label {

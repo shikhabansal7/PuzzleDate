@@ -23,7 +23,7 @@ type ResetStrategy =
   | "poople-current"
   | "custom-clear-all";
 
-const EXPECTED_EXTENSION_VERSION = "1.0.19";
+const EXPECTED_EXTENSION_VERSION = "1.0.20";
 
 const validExtensionVersion = (value: unknown) =>
   typeof value === "string" && /^\d+\.\d+\.\d+$/.test(value)
@@ -137,6 +137,7 @@ const CLOCK_SHIM_URLS = new Set([
 ]);
 
 const ARCHIVE_STORAGE_KEY = "puzzle-date-archive-date";
+const LOOKUP_COLLAPSED_KEY = "puzzle-date-lookup-collapsed";
 
 const isoToday = () => {
   const now = new Date();
@@ -275,6 +276,7 @@ export default function Home() {
   >("idle");
   const [lookupSenses, setLookupSenses] = useState<DictionarySense[]>([]);
   const [lookupError, setLookupError] = useState("");
+  const [lookupCollapsed, setLookupCollapsed] = useState(false);
   const lookupRequestRef = useRef<AbortController | null>(null);
   const pendingCustomHostsRef = useRef<string[]>([]);
   const activePuzzle = orderedPuzzles[activeIndex];
@@ -535,27 +537,6 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goNext, goPrevious]);
 
-  // A focused cross-origin game frame swallows arrow keys, so the extension
-  // relays the unhandled ones back to Puzzle Date.
-  useEffect(() => {
-    const handleFrameArrowKey = (event: MessageEvent) => {
-      if (event.source !== frameRef.current?.contentWindow) return;
-      const message = event.data as
-        | { source?: unknown; type?: unknown; key?: unknown }
-        | null;
-      if (
-        message?.source !== "puzzle-date-extension" ||
-        message.type !== "PUZZLE_DATE_ARROW_KEY"
-      ) {
-        return;
-      }
-      if (message.key === "ArrowLeft") goPrevious();
-      if (message.key === "ArrowRight") goNext();
-    };
-
-    window.addEventListener("message", handleFrameArrowKey);
-    return () => window.removeEventListener("message", handleFrameArrowKey);
-  }, [goNext, goPrevious]);
 
   const reloadGame = () => {
     if (extensionStatus !== "ready") {
@@ -583,9 +564,8 @@ export default function Home() {
     );
   };
 
-  const lookUpWord = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const word = lookupWord.trim();
+  const runLookup = useCallback(async (rawWord: string) => {
+    const word = rawWord.replace(/\s+/g, " ").trim();
     if (!word) return;
 
     lookupRequestRef.current?.abort();
@@ -623,9 +603,59 @@ export default function Home() {
       setLookupStatus("error");
       setLookupError("Lookup failed. Check your connection, or try Google.");
     }
+  }, []);
+
+  const lookUpWord = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    runLookup(lookupWord);
   };
 
+  // A focused cross-origin game frame swallows arrow keys, so the extension
+  // relays the unhandled ones back to Puzzle Date.
+  useEffect(() => {
+    const handleFrameArrowKey = (event: MessageEvent) => {
+      if (event.source !== frameRef.current?.contentWindow) return;
+      const message = event.data as
+        | { source?: unknown; type?: unknown; key?: unknown; text?: unknown }
+        | null;
+      if (message?.source !== "puzzle-date-extension") return;
+
+      if (message.type === "PUZZLE_DATE_ARROW_KEY") {
+        if (message.key === "ArrowLeft") goPrevious();
+        if (message.key === "ArrowRight") goNext();
+        return;
+      }
+
+      // Right-clicking a selection inside a game looks it up here.
+      if (message.type === "PUZZLE_DATE_LOOKUP_SELECTION") {
+        const text = typeof message.text === "string" ? message.text : "";
+        if (!text.trim() || text.length > 60) return;
+        setLookupWord(text);
+        setLookupCollapsed(false);
+        window.localStorage.setItem(LOOKUP_COLLAPSED_KEY, "false");
+        runLookup(text);
+      }
+    };
+
+    window.addEventListener("message", handleFrameArrowKey);
+    return () => window.removeEventListener("message", handleFrameArrowKey);
+  }, [goNext, goPrevious, runLookup]);
+
   useEffect(() => () => lookupRequestRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (window.localStorage.getItem(LOOKUP_COLLAPSED_KEY) === "true") {
+      setLookupCollapsed(true);
+    }
+  }, []);
+
+  const toggleLookup = () => {
+    setLookupCollapsed((collapsed) => {
+      const next = !collapsed;
+      window.localStorage.setItem(LOOKUP_COLLAPSED_KEY, String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     const saved = window.localStorage.getItem(ARCHIVE_STORAGE_KEY) ?? "";
@@ -883,14 +913,16 @@ export default function Home() {
             >
               ×
             </button>
-            <p className="eyebrow">Chrome extension · Version 1.0.19</p>
+            <p className="eyebrow">Chrome extension · Version 1.0.20</p>
             <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
             <p>
               Install the extension once to embed supported games and let Puzzle
               Date reset them from inside the app.
             </p>
             <p>
-              Version 1.0.19 restores ad blocking on the embedded games, which
+              Version 1.0.20 adds right-click lookup: highlight a word inside a
+              game and right-click it to search it in the word lookup panel.
+              It also restores ad blocking on the embedded games, which
               added new advertising partners the old list did not cover. The
               blocklist grew from 23 audited domains to 78.
               It also lets Verticle, FoxiMax, Poople, Unwordle, Waffle,
@@ -918,7 +950,7 @@ export default function Home() {
               href="/PuzzleDate/downloads/puzzle-date-game-reset.zip"
               download
             >
-              Download extension 1.0.19
+              Download extension 1.0.20
             </a>
             <div className="extension-guide-steps">
               <section aria-labelledby="new-install-title">
@@ -940,14 +972,14 @@ export default function Home() {
                 <h3 id="update-install-title">Already installed?</h3>
                 <ol>
                   <li>Remove the old Puzzle Date extension in Chrome.</li>
-                  <li>Download and unzip version 1.0.19.</li>
+                  <li>Download and unzip version 1.0.20.</li>
                   <li>Load the new folder, then refresh Puzzle Date.</li>
                 </ol>
               </section>
             </div>
             <p>
               The light beside Extension is red when it is missing, yellow when
-              an update is available, and green when version 1.0.19 is ready.
+              an update is available, and green when version 1.0.20 is ready.
             </p>
             <p className="extension-reset-warning">
               <strong>Custom-game warning:</strong> Start Over clears all local
@@ -966,9 +998,28 @@ export default function Home() {
 
       <div className="stage">
         {/* ponytail: always-on panel. Add a collapse toggle if it crowds the games. */}
-        <aside className="lookup" aria-label="Word lookup">
+        <aside
+          className="lookup"
+          data-collapsed={lookupCollapsed ? "true" : undefined}
+          aria-label="Word lookup"
+        >
+          <button
+            className="lookup-toggle"
+            type="button"
+            onClick={toggleLookup}
+            aria-expanded={!lookupCollapsed}
+            aria-controls="lookup-body"
+            title={lookupCollapsed ? "Show word lookup" : "Hide word lookup"}
+          >
+            <span className="lookup-toggle-label">Look up a word</span>
+            <span aria-hidden="true">{lookupCollapsed ? "›" : "‹"}</span>
+          </button>
+
+          <div className="lookup-body" id="lookup-body" hidden={lookupCollapsed}>
           <form onSubmit={lookUpWord}>
-            <label htmlFor="lookup-word">Look up a word</label>
+            <label className="visually-hidden" htmlFor="lookup-word">
+              Look up a word
+            </label>
             <div className="lookup-field">
               <input
                 id="lookup-word"
@@ -1035,6 +1086,7 @@ export default function Home() {
               Search Google for “{lookupTerm}” <span aria-hidden="true">↗</span>
             </a>
           )}
+          </div>
         </aside>
 
         <section className="frame-wrap" aria-label={`${activePuzzle.name} puzzle`}>

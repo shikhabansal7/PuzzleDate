@@ -27,6 +27,7 @@ Deployed as a static site to **GitHub Pages** at `https://shikhabansal7.github.i
 | `scripts/check-arrow-relay.mjs` | Behavioral check of the arrow-key relay's guards against a stub DOM. Spawned by the validator. |
 | `scripts/check-clock-shim.mjs` | Replays each clock-derived game's real day formula through the shimmed `Date`. Spawned by the validator. |
 | `scripts/check-ad-coverage.mjs` | Replays real third-party hosts observed on each game against `AD_SERVING_DOMAINS`. Spawned by the validator. |
+| `scripts/check-lookup-selection.mjs` | Checks the right-click selection relay only hijacks the context menu for a real selection. Spawned by the validator. |
 | `scripts/package-extension.mjs` | Validates, then zips the 4 extension files reproducibly into `public/downloads/`. |
 | `public/extension-install.html` | Standalone install/instructions page. |
 | `executions/*.json` | Historical task-plan records for past features. Documentation, not code. |
@@ -226,6 +227,24 @@ Only the first 3 definitions per part of speech are rendered.
 
 The global arrow-key handler already ignores events whose target matches
 `input, textarea, select`, so typing in this box does not flip puzzles.
+
+**Collapsing.** `lookupCollapsed` persists at `puzzle-date-lookup-collapsed`. The
+column width comes from `.stage:has(.lookup[data-collapsed])` — 38px on desktop, a
+full-width strip on mobile — and the body is hidden with the `hidden` attribute so it
+leaves the a11y tree. The toggle carries `aria-expanded` / `aria-controls`.
+
+**Right-click lookup.** A cross-origin frame's selection is invisible to the page, so
+`forwardLookupSelection` (injected alongside the ad CSS) listens for `contextmenu` in
+the game frame and posts the highlighted text out as `PUZZLE_DATE_LOOKUP_SELECTION`.
+It calls `preventDefault()` **only** when there is a usable selection (non-empty,
+≤60 chars after whitespace collapsing) — right-clicking with nothing selected must
+still give the player the browser's own menu. The page accepts the relay only when
+`event.source === frameRef.current?.contentWindow`, re-validates the length, and
+reopens a collapsed panel for the result.
+
+`runLookup(word)` is the shared entry point — the form's submit handler and the
+relay both call it, so there is one fetch path with one `AbortController`.
+`scripts/check-lookup-selection.mjs` covers the frame-side guards.
 
 ### Custom games (+ button)
 
