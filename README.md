@@ -160,6 +160,21 @@ the page, with a Google link for anything it misses.
   the active game frame's own window, so another frame cannot drive the panel.
   A collapsed panel reopens itself for the result.
 
+## Interface
+
+- **Date and zoom** sit to the left of the heading, next to the wordmark.
+- **Shuffle** is a mode, not a one-shot button: it lives in the footer beside
+  Previous, and toggling it keeps you on the game you were playing. Off restores
+  the running order; Connections stays first either way.
+- **The footer page control** is a windowed numeric pager (`1 … 7 8 9 10`), so
+  eleven games take about the same width as five.
+- **Icons** are inline SVG on one stroked 24px grid — no icon font, no
+  dependency.
+- **One font** (a system stack) across the whole app. Numerals use
+  `tabular-nums` so counters do not jitter.
+- **Motion** is driven by shared duration/easing tokens and is fully disabled
+  under `prefers-reduced-motion`.
+
 ## Game zoom
 
 A zoom selector in the title bar scales the embedded game between 50% and 200%,

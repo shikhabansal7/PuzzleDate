@@ -6,7 +6,7 @@ Guidance for Claude Code working in this repository.
 
 **Puzzle Date** — a single-page web app that plays a rotation of daily word/puzzle
 games in one place. It embeds each game in an iframe when possible, lets the user
-step through them with ← / →, and ships a companion Chrome extension (**Puzzle Date
+step through them with ⌘/Ctrl + ← / →, and ships a companion Chrome extension (**Puzzle Date
 Game Reset**) that makes embedding possible for sites that block framing, adds a
 per-game "Start Over" reset, blocks ads inside embedded games, and dismisses
 cookie-consent banners privately.
@@ -18,7 +18,7 @@ Deployed as a static site to **GitHub Pages** at `https://shikhabansal7.github.i
 | Path | Role |
 |---|---|
 | `app/page.tsx` | The entire app. Client component, ~810 lines. All UI + state. |
-| `app/globals.css` | All styling. Design tokens in `:root`, one `@media (max-width: 680px)` breakpoint, one reduced-motion block. |
+| `app/globals.css` | All styling. Design + motion tokens in `:root`, one `@media (max-width: 680px)` breakpoint, one reduced-motion block. |
 | `app/layout.tsx` | Next.js root layout (Geist fonts, metadata). Only used by the vinext/Cloudflare build. |
 | `app/chatgpt-auth.ts` | Unused starter helper for OpenAI Sites SIWC auth headers. Not wired into Puzzle Date. |
 | `pages/` | Vite entry (`index.html` + `main.tsx`) that mounts `app/page.tsx` as a plain SPA. **This is what actually ships.** |
@@ -72,16 +72,39 @@ Built-ins: Connections (NYT), Word 500, FoxiMax, Verticle, Waffle, Unwordle, 4 �
 - Order persists in `localStorage["puzzle-date-order"]` as an array of URLs. Restore
   only applies if the saved list matches the available list length **and** starts with
   Connections; otherwise the default order is used.
-- **Shuffle rest** Fisher-Yates-shuffles everything after index 0 (Connections stays
-  first), resets to index 0, and persists.
-- Navigation: **⌘/Ctrl + ← / →** (`isNavChord`), Previous/Next buttons, numbered step
-  dots, and a hover/focus "Jump to a game" menu. Bare arrows deliberately do **not**
+- Navigation: **⌘/Ctrl + ← / →** (`isNavChord`), Previous/Next buttons, the footer
+  pager, and a hover/focus "Jump to a game" menu. Bare arrows deliberately do **not**
   navigate — they belong to games that move a cursor with them. Chords are ignored
   while typing in an input/textarea/select/contenteditable, and when Alt or Shift is
   held.
+- **Shuffle is a mode, not an action** (`shuffleMode`, persisted at
+  `puzzle-date-shuffle`). Toggling it on shuffles everything after Connections;
+  toggling it off restores `puzzlesForDay(...) + customPuzzles`. Either way you stay on
+  the game you were playing, the way a music player keeps the current track. It lives
+  in the footer next to Previous.
 - **Both the page and the frame relay call `preventDefault()` on the chord**, because
   ⌘ + ← / → is the browser's back/forward on macOS. Without it, navigating the
   rotation would also navigate history.
+
+### UI conventions
+
+- **Icons are inline SVG** from the `ICONS` map + `<Icon name=.../>`, all on one 24px
+  stroked grid sized by `font-size` (`.icon` is `1em`). No icon font, no dependency.
+  Don't reintroduce glyph icons (`↓`, `×`, `→`) — they never matched the text weight.
+- **One font family.** `--font` is a system stack, used everywhere. The old CSS mixed
+  Arial, Georgia and `var(--font-geist-mono)` — and that last one was **never defined
+  in the shipped Vite build** (only `app/layout.tsx` sets it, which the Pages build
+  does not load), so those rules silently fell back to bare `monospace`. Numerals use
+  `font-variant-numeric: tabular-nums` instead of a separate mono family.
+- **Motion** runs off `--fast`/`--slow`/`--ease` tokens, with one shared `transition`
+  on interactive elements and two keyframes (`fade-in`, `fade-rise`). Entrance
+  animations deliberately have **no `fill-mode`**: if an animation never runs the
+  element stays at its normal opacity rather than invisible.
+  `prefers-reduced-motion` now blanket-disables durations rather than naming
+  three selectors.
+- **Footer pager** (`pagerSlots`) is a windowed numeric control: first, last, the
+  current page and its neighbours, gaps for the rest, filled outward from the cursor so
+  the width stays ~constant. Replaced 11 dashes plus a separate `01 / 11` counter.
 
 ### Game zoom
 
@@ -442,4 +465,6 @@ npm run lint
   from starting early.
 - **Ad and consent lists are audited, not open-ended.** Adding a domain or selector
   means updating the matching expected list in the validator, which is the review record.
-- Storage keys in use: `puzzle-date-order`, `puzzle-date-custom-games`.
+- Storage keys in use: `puzzle-date-order`, `puzzle-date-custom-games`,
+  `puzzle-date-archive-date`, `puzzle-date-zoom`, `puzzle-date-lookup-collapsed`,
+  `puzzle-date-shuffle`.

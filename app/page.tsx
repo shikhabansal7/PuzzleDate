@@ -1,6 +1,109 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+// One stroked 24px grid for every icon, so they share weight and alignment.
+const ICONS: Record<string, ReactNode> = {
+  download: (
+    <>
+      <path d="M12 4v10" />
+      <path d="m8 11 4 4 4-4" />
+      <path d="M5 19h14" />
+    </>
+  ),
+  plus: <path d="M12 5v14M5 12h14" />,
+  close: <path d="M6 6 18 18M18 6 6 18" />,
+  chevronLeft: <path d="m14 6-6 6 6 6" />,
+  chevronRight: <path d="m10 6 6 6-6 6" />,
+  arrowLeft: (
+    <>
+      <path d="M19 12H5" />
+      <path d="m11 6-6 6 6 6" />
+    </>
+  ),
+  arrowRight: (
+    <>
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-3.8-3.8" />
+    </>
+  ),
+  external: (
+    <>
+      <path d="M14 5h5v5" />
+      <path d="m19 5-7.5 7.5" />
+      <path d="M18 14.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.5" />
+    </>
+  ),
+  shuffle: (
+    <>
+      <path d="M3 17h2.2a4 4 0 0 0 3.3-1.8l5-7.4A4 4 0 0 1 16.8 6H21" />
+      <path d="m18 3 3 3-3 3" />
+      <path d="M3 7h2.2a4 4 0 0 1 3.3 1.8l.6.9" />
+      <path d="M21 17h-4.2a4 4 0 0 1-3.3-1.8l-.6-.9" />
+      <path d="m18 14 3 3-3 3" />
+    </>
+  ),
+  rotate: (
+    <>
+      <path d="M20 12a8 8 0 1 1-2.3-5.6" />
+      <path d="M20 4v4h-4" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+      <path d="M3.5 10h17M8 3.5v3M16 3.5v3" />
+    </>
+  ),
+};
+
+function Icon({ name, className }: { name: keyof typeof ICONS; className?: string }) {
+  return (
+    <svg
+      className={className ? `icon ${className}` : "icon"}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {ICONS[name]}
+    </svg>
+  );
+}
+
+// Windowed pager: first, last, and the current page's neighbours, with gaps
+// standing in for the rest. Keeps the footer to a fixed width at any count.
+const pagerSlots = (count: number, active: number): Array<number | "gap"> => {
+  if (count <= 7) return Array.from({ length: count }, (_, index) => index);
+
+  const slots = new Set([0, count - 1, active]);
+  for (const offset of [-1, 1]) {
+    const neighbour = active + offset;
+    if (neighbour > 0 && neighbour < count - 1) slots.add(neighbour);
+  }
+  // Keep the run a constant length wherever the player is, filling outward from
+  // the current page first so the numbers near you stay visible at the ends.
+  for (const edge of [active - 2, active + 2, 1, 2, count - 2, count - 3]) {
+    if (slots.size >= 5) break;
+    if (edge > 0 && edge < count - 1) slots.add(edge);
+  }
+
+  const sorted = [...slots].sort((a, b) => a - b);
+  return sorted.flatMap((page, index) =>
+    index > 0 && page - sorted[index - 1] > 1 ? ["gap" as const, page] : [page],
+  );
+};
 
 type Puzzle = {
   name: string;
@@ -138,6 +241,7 @@ const CLOCK_SHIM_URLS = new Set([
 
 const ARCHIVE_STORAGE_KEY = "puzzle-date-archive-date";
 const LOOKUP_COLLAPSED_KEY = "puzzle-date-lookup-collapsed";
+const SHUFFLE_STORAGE_KEY = "puzzle-date-shuffle";
 const ZOOM_STORAGE_KEY = "puzzle-date-zoom";
 
 const ZOOM_LEVELS = [0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
@@ -285,6 +389,7 @@ export default function Home() {
   const [lookupError, setLookupError] = useState("");
   const [lookupCollapsed, setLookupCollapsed] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [shuffleMode, setShuffleMode] = useState(false);
   const lookupRequestRef = useRef<AbortController | null>(null);
   const pendingCustomHostsRef = useRef<string[]>([]);
   const activePuzzle = orderedPuzzles[activeIndex];
@@ -565,13 +670,19 @@ export default function Home() {
     );
   };
 
-  const shuffleRest = () => {
-    const nextOrder = [
-      orderedPuzzles[0],
-      ...shuffle(orderedPuzzles.slice(1)),
-    ];
+  // A mode, like a music player's shuffle: turning it off restores the running
+  // order, and either way you stay on the game you were playing.
+  const toggleShuffle = () => {
+    const next = !shuffleMode;
+    const current = orderedPuzzles[activeIndex];
+    const base = [...puzzlesForDay(new Date().getDay()), ...customPuzzles];
+    const nextOrder = next ? [base[0], ...shuffle(base.slice(1))] : base;
+    const stayOn = nextOrder.findIndex(({ url }) => url === current?.url);
+
+    setShuffleMode(next);
     setOrderedPuzzles(nextOrder);
-    setActiveIndex(0);
+    setActiveIndex(stayOn >= 0 ? stayOn : 0);
+    window.localStorage.setItem(SHUFFLE_STORAGE_KEY, String(next));
     window.localStorage.setItem(
       "puzzle-date-order",
       JSON.stringify(nextOrder.map(({ url }) => url)),
@@ -663,6 +774,9 @@ export default function Home() {
     }
     const savedZoom = Number(window.localStorage.getItem(ZOOM_STORAGE_KEY));
     if (ZOOM_LEVELS.includes(savedZoom)) setZoom(savedZoom);
+    if (window.localStorage.getItem(SHUFFLE_STORAGE_KEY) === "true") {
+      setShuffleMode(true);
+    }
   }, []);
 
   const changeZoom = (value: number) => {
@@ -777,13 +891,58 @@ export default function Home() {
   return (
     <main className="app-shell" ref={appShellRef} tabIndex={-1}>
       <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            P
-          </span>
-          <div>
-            <p className="eyebrow">Your daily rotation</p>
-            <h1>Puzzle Date</h1>
+        <div className="topbar-left">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true">
+              P
+            </span>
+            <div>
+              <p className="eyebrow">Your daily rotation</p>
+              <h1>Puzzle Date</h1>
+            </div>
+          </div>
+
+          <div className="view-controls">
+            <div className="date-control">
+              <label className="visually-hidden" htmlFor="archive-date">
+                Puzzle date
+              </label>
+              <Icon name="calendar" className="field-icon" />
+              <input
+                id="archive-date"
+                type="date"
+                max={isoToday()}
+                value={archiveDate}
+                onChange={(event) => changeArchiveDate(event.target.value)}
+                title="Play an earlier day's puzzles"
+              />
+              {archiveDate && (
+                <button
+                  className="utility-button"
+                  type="button"
+                  onClick={() => changeArchiveDate("")}
+                >
+                  Today
+                </button>
+              )}
+            </div>
+            <div className="zoom-control">
+              <label className="visually-hidden" htmlFor="game-zoom">
+                Game zoom
+              </label>
+              <select
+                id="game-zoom"
+                value={zoom}
+                onChange={(event) => changeZoom(Number(event.target.value))}
+                title="Zoom the embedded game"
+              >
+                {ZOOM_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {Math.round(level * 100)}%
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -808,55 +967,14 @@ export default function Home() {
         </div>
 
         <div className="header-actions">
-          <div className="date-control">
-            <label className="visually-hidden" htmlFor="archive-date">
-              Puzzle date
-            </label>
-            <input
-              id="archive-date"
-              type="date"
-              max={isoToday()}
-              value={archiveDate}
-              onChange={(event) => changeArchiveDate(event.target.value)}
-              title="Play an earlier day's puzzles"
-            />
-            {archiveDate && (
-              <button
-                className="utility-button"
-                type="button"
-                onClick={() => changeArchiveDate("")}
-              >
-                Today
-              </button>
-            )}
-          </div>
-          <div className="zoom-control">
-            <label className="visually-hidden" htmlFor="game-zoom">
-              Game zoom
-            </label>
-            <select
-              id="game-zoom"
-              value={zoom}
-              onChange={(event) => changeZoom(Number(event.target.value))}
-              title="Zoom the embedded game"
-            >
-              {ZOOM_LEVELS.map((level) => (
-                <option key={level} value={level}>
-                  {Math.round(level * 100)}%
-                </option>
-              ))}
-            </select>
-          </div>
-          <button className="utility-button" type="button" onClick={shuffleRest}>
-            Shuffle rest
-          </button>
           {activePuzzle.resetStrategy && canFramePuzzle(activePuzzle) && (
             <button
               className="utility-button"
               type="button"
               onClick={reloadGame}
             >
-              Start Over
+              <Icon name="rotate" />
+              <span className="button-label">Start Over</span>
             </button>
           )}
           <button
@@ -866,7 +984,7 @@ export default function Home() {
             aria-label={`${extensionHealthText}. Open extension download and instructions`}
             title={extensionHealthText}
           >
-            <span aria-hidden="true">↓</span>
+            <Icon name="download" />
             <span className="extension-help-label">Extension</span>
             <span
               className={`extension-health-light extension-health-light--${extensionHealth}`}
@@ -886,7 +1004,7 @@ export default function Home() {
             aria-label="Add a game"
             title="Add a game"
           >
-            +
+            <Icon name="plus" />
           </button>
         </div>
       </header>
@@ -905,7 +1023,7 @@ export default function Home() {
               onClick={() => setShowAddGame(false)}
               aria-label="Close add game"
             >
-              ×
+              <Icon name="close" />
             </button>
             <p className="eyebrow">Your rotation</p>
             <h2 id="add-game-title">Add a game</h2>
@@ -950,7 +1068,7 @@ export default function Home() {
               onClick={() => setShowExtensionGuide(false)}
               aria-label="Close extension installation message"
             >
-              ×
+              <Icon name="close" />
             </button>
             <p className="eyebrow">Chrome extension · Version 1.0.21</p>
             <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
@@ -992,6 +1110,7 @@ export default function Home() {
               href="/PuzzleDate/downloads/puzzle-date-game-reset.zip"
               download
             >
+              <Icon name="download" />
               Download extension 1.0.21
             </a>
             <div className="extension-guide-steps">
@@ -1054,7 +1173,7 @@ export default function Home() {
             title={lookupCollapsed ? "Show word lookup" : "Hide word lookup"}
           >
             <span className="lookup-toggle-label">Look up a word</span>
-            <span aria-hidden="true">{lookupCollapsed ? "›" : "‹"}</span>
+            <Icon name={lookupCollapsed ? "chevronRight" : "chevronLeft"} />
           </button>
 
           <div className="lookup-body" id="lookup-body" hidden={lookupCollapsed}>
@@ -1072,7 +1191,7 @@ export default function Home() {
                 onChange={(event) => setLookupWord(event.target.value)}
               />
               <button type="submit" aria-label="Look up word">
-                →
+                <Icon name="search" />
               </button>
             </div>
           </form>
@@ -1125,7 +1244,7 @@ export default function Home() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Search Google for “{lookupTerm}” <span aria-hidden="true">↗</span>
+              Search Google for “{lookupTerm}” <Icon name="external" />
             </a>
           )}
           </div>
@@ -1146,7 +1265,7 @@ export default function Home() {
               also gives it the best chance to keep your progress.
             </p>
             <a href={activePuzzleUrl} target="_blank" rel="noreferrer">
-              Open {activePuzzle.name} <span aria-hidden="true">↗</span>
+              Open {activePuzzle.name} <Icon name="external" />
             </a>
           </div>
         )}
@@ -1180,14 +1299,29 @@ export default function Home() {
         aria-label="Puzzle navigation"
         onPointerEnter={() => appShellRef.current?.focus()}
       >
-        {activeIndex > 0 ? (
-          <button type="button" onClick={goPrevious} aria-label="Previous puzzle">
-            <span aria-hidden="true">←</span>
-            <span className="button-label">Previous</span>
+        <div className="controls-left">
+          <button
+            className="shuffle-toggle"
+            type="button"
+            onClick={toggleShuffle}
+            aria-pressed={shuffleMode}
+            title={shuffleMode ? "Shuffle is on" : "Shuffle is off"}
+          >
+            <Icon name="shuffle" />
+            <span className="visually-hidden">
+              Shuffle {shuffleMode ? "on" : "off"}
+            </span>
           </button>
-        ) : (
-          <span className="control-placeholder" aria-hidden="true" />
-        )}
+
+          {activeIndex > 0 ? (
+            <button type="button" onClick={goPrevious} aria-label="Previous puzzle">
+              <Icon name="arrowLeft" />
+              <span className="button-label">Previous</span>
+            </button>
+          ) : (
+            <span className="control-placeholder" aria-hidden="true" />
+          )}
+        </div>
 
         <div className="progress">
           <div className="game-menu" aria-label="Choose a game">
@@ -1216,34 +1350,39 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <span className="count">
-            {String(activeIndex + 1).padStart(2, "0")}
-            <span aria-hidden="true"> / </span>
-            {String(orderedPuzzles.length).padStart(2, "0")}
-          </span>
-          <div className="steps">
-            {orderedPuzzles.map((puzzle, index) => (
-              <button
-                key={puzzle.url}
-                type="button"
-                className={index === activeIndex ? "active" : ""}
-                onClick={() => goToPuzzle(index)}
-                aria-label={`Go to ${puzzle.name}`}
-                aria-current={index === activeIndex ? "step" : undefined}
-              />
-            ))}
+          <div className="pager">
+            {pagerSlots(orderedPuzzles.length, activeIndex).map((slot, index) =>
+              slot === "gap" ? (
+                <span className="pager-gap" key={`gap-${index}`} aria-hidden="true">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={orderedPuzzles[slot].url}
+                  type="button"
+                  className={slot === activeIndex ? "active" : ""}
+                  onClick={() => goToPuzzle(slot)}
+                  aria-label={`Go to ${orderedPuzzles[slot].name}`}
+                  aria-current={slot === activeIndex ? "page" : undefined}
+                >
+                  {slot + 1}
+                </button>
+              ),
+            )}
           </div>
-          <span className="shortcut">Use ⌘ / Ctrl + ← →</span>
+          <span className="shortcut">⌘ / Ctrl + ← →</span>
         </div>
 
-        {activeIndex < orderedPuzzles.length - 1 ? (
-          <button type="button" onClick={goNext} aria-label="Next puzzle">
-            <span className="button-label">Next</span>
-            <span aria-hidden="true">→</span>
-          </button>
-        ) : (
-          <span className="control-placeholder" aria-hidden="true" />
-        )}
+        <div className="controls-right">
+          {activeIndex < orderedPuzzles.length - 1 ? (
+            <button type="button" onClick={goNext} aria-label="Next puzzle">
+              <span className="button-label">Next</span>
+              <Icon name="arrowRight" />
+            </button>
+          ) : (
+            <span className="control-placeholder" aria-hidden="true" />
+          )}
+        </div>
       </nav>
     </main>
   );

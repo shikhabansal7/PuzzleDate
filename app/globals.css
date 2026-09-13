@@ -6,10 +6,68 @@
   --cream: #fbfaf5;
   --line: #d8d4c9;
   --green: #274e3a;
+  --muted: #6f716b;
+
+  /* One family for the whole app. System stack: no webfont request, no FOUT,
+     and identical metrics to the rest of the OS. */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --fast: 140ms;
+  --slow: 260ms;
 }
 
 * {
   box-sizing: border-box;
+}
+
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  font-size: 15px;
+  vertical-align: middle;
+}
+
+/* Every control shares one transition, so nothing snaps. */
+button,
+select,
+input,
+a,
+.lookup,
+.stage,
+.game-menu {
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    color var(--fast) var(--ease),
+    box-shadow var(--fast) var(--ease),
+    opacity var(--fast) var(--ease),
+    transform var(--fast) var(--ease),
+    grid-template-columns var(--slow) var(--ease);
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 html,
@@ -21,7 +79,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font);
 }
 
 button,
@@ -43,10 +101,53 @@ a {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
+  gap: 16px;
   background: var(--cream);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 0 20px;
+}
+
+/* The left cell now carries the brand plus the view controls, so let it size
+   to content and give the heading the slack instead. */
+.topbar {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.topbar .puzzle-title {
+  justify-self: center;
+}
+
+.controls-left,
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.controls-right {
+  justify-self: end;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* Date and zoom sit left of the heading, separated by a hairline rule. */
+.view-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 18px;
+  border-left: 1px solid var(--line);
+}
+
+.field-icon {
+  color: var(--muted);
+  pointer-events: none;
 }
 
 .brand {
@@ -64,7 +165,7 @@ a {
   border-radius: 50%;
   background: var(--green);
   color: #fff;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font);
   font-size: 21px;
   font-style: italic;
 }
@@ -80,7 +181,7 @@ a {
 
 h1 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font);
   font-size: 21px;
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -107,7 +208,7 @@ h1 {
 }
 
 .puzzle-title strong {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font);
   font-size: 17px;
   font-weight: 500;
 }
@@ -140,6 +241,10 @@ h1 {
 }
 
 .utility-button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--line);
   border-radius: 9px;
   background: #fff;
@@ -147,7 +252,7 @@ h1 {
   cursor: pointer;
   font-size: 10px;
   font-weight: 700;
-  padding: 8px 10px;
+  padding: 0 11px;
   white-space: nowrap;
 }
 
@@ -168,7 +273,8 @@ h1 {
   border-radius: 10px;
   background: var(--cream);
   color: var(--ink);
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 
@@ -183,7 +289,8 @@ h1 {
   border-radius: 10px;
   background: var(--cream);
   color: var(--ink);
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 
@@ -211,14 +318,19 @@ h1 {
   background: var(--green);
   color: #fff;
   cursor: pointer;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font);
   font-size: 22px;
   font-weight: 400;
   line-height: 1;
 }
 
+.add-game-button .icon {
+  font-size: 18px;
+}
+
 .add-game-button:hover {
   background: #193d2b;
+  transform: rotate(90deg);
 }
 
 .extension-help-button {
@@ -236,11 +348,6 @@ h1 {
   font-weight: 700;
   padding: 0 11px;
   white-space: nowrap;
-}
-
-.extension-help-button > span:first-child {
-  font-size: 16px;
-  line-height: 1;
 }
 
 .extension-health-light {
@@ -291,6 +398,7 @@ h1 {
 }
 
 .modal-backdrop {
+  animation: fade-in var(--slow) var(--ease);
   position: fixed;
   inset: 0;
   z-index: 20;
@@ -302,6 +410,7 @@ h1 {
 }
 
 .add-game-modal {
+  animation: fade-rise var(--slow) var(--ease);
   position: relative;
   width: min(430px, 100%);
   border: 1px solid var(--line);
@@ -313,7 +422,7 @@ h1 {
 
 .add-game-modal h2 {
   margin: 5px 0 8px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font);
   font-size: 30px;
   font-weight: 500;
 }
@@ -325,7 +434,9 @@ h1 {
 }
 
 .extension-download-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border-radius: 10px;
   background: var(--green);
   color: #fff;
@@ -362,7 +473,7 @@ h1 {
 
 .extension-guide-steps h3 {
   margin: 0 0 8px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font);
   font-size: 17px;
   font-weight: 500;
 }
@@ -580,9 +691,13 @@ h1 {
   color: #a33b32;
 }
 
+.lookup-entry {
+  animation: fade-rise var(--slow) var(--ease);
+}
+
 .lookup-entry h3 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font);
   font-size: 20px;
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -597,7 +712,8 @@ h1 {
 .lookup-phonetic {
   margin: 2px 0 0;
   color: #6f716b;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 
@@ -630,6 +746,9 @@ h1 {
 }
 
 .lookup-google {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--green);
   font-size: 11px;
   font-weight: 700;
@@ -654,6 +773,7 @@ h1 {
 }
 
 .external-game {
+  animation: fade-rise var(--slow) var(--ease);
   width: min(460px, calc(100% - 40px));
   height: 100%;
   margin: auto;
@@ -674,7 +794,7 @@ h1 {
 
 .external-game h2 {
   margin: 4px 0 10px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font);
   font-size: clamp(32px, 5vw, 54px);
   font-weight: 500;
   letter-spacing: -0.04em;
@@ -689,6 +809,9 @@ h1 {
 }
 
 .external-game a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border-radius: 11px;
   background: var(--green);
   color: #fff;
@@ -699,6 +822,7 @@ h1 {
 }
 
 iframe {
+  animation: fade-in var(--slow) var(--ease);
   width: 100%;
   height: 100%;
   display: block;
@@ -710,7 +834,8 @@ iframe {
   padding: 0 14px;
 }
 
-.controls > button {
+.controls-left > button:not(.shuffle-toggle),
+.controls-right > button {
   width: max-content;
   display: flex;
   align-items: center;
@@ -727,48 +852,65 @@ iframe {
   transition: transform 160ms ease, background 160ms ease;
 }
 
-.controls > button:last-child {
-  justify-self: end;
-}
-
-.controls > button:hover {
+.controls-left > button:not(.shuffle-toggle):hover,
+.controls-right > button:hover {
   background: #193d2b;
   transform: translateY(-1px);
 }
 
-.controls > button:active {
+.controls-left > button:not(.shuffle-toggle):active,
+.controls-right > button:active {
   transform: translateY(0);
 }
 
 .progress {
   position: relative;
   display: grid;
-  grid-template-columns: auto auto auto;
+  grid-template-columns: auto auto;
   align-items: center;
-  gap: 13px;
+  gap: 14px;
 }
 
-.count {
-  color: #51534e;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-}
-
-.steps {
+/* Numbered page control, windowed so 11 games take no more room than 5. */
+.pager {
   display: flex;
-  gap: 9px;
+  align-items: center;
+  gap: 2px;
 }
 
-.steps button {
-  width: 24px;
-  height: 5px;
+.pager button {
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
   border: 0;
-  border-radius: 99px;
-  background: #ccc9c0;
+  border-radius: 8px;
+  background: transparent;
+  color: #5f625b;
   cursor: pointer;
-  padding: 0;
-  transition: background-color 180ms ease, transform 180ms ease;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 0 6px;
+}
+
+.pager button:hover {
+  background: #ece9e0;
+  color: var(--ink);
+}
+
+.pager button.active {
+  background: var(--green);
+  color: #fff;
+  font-weight: 700;
+}
+
+.pager-gap {
+  width: 16px;
+  color: #a5a79f;
+  font-size: 12px;
+  text-align: center;
+  user-select: none;
 }
 
 .game-menu {
@@ -844,7 +986,8 @@ iframe {
 
 .game-menu-list button span {
   color: #99968e;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
   font-size: 9px;
 }
 
@@ -865,17 +1008,33 @@ iframe {
   color: #cbd9ce;
 }
 
-.steps button:hover {
-  transform: scaleX(1.08);
+.shuffle-toggle {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
 }
 
-.steps button:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 3px;
+.shuffle-toggle:hover {
+  border-color: var(--green);
+  color: var(--green);
 }
 
-.steps button.active {
+/* On is a filled state, the way a music player shows shuffle. */
+.shuffle-toggle[aria-pressed="true"] {
+  border-color: var(--green);
   background: var(--green);
+  color: #fff;
+}
+
+.shuffle-toggle .icon {
+  font-size: 17px;
 }
 
 .shortcut {
@@ -891,8 +1050,9 @@ iframe {
     gap: 8px;
   }
 
-  /* One row cannot hold the title and the date control at this width, so the
-     actions wrap onto their own line instead of overlapping the title. */
+  /* Two rows at this width: identity on top, controls beneath. `contents`
+     promotes the brand and view controls to grid items so they can be placed
+     independently. */
   .topbar {
     grid-template-columns: auto minmax(0, 1fr);
     row-gap: 8px;
@@ -900,11 +1060,45 @@ iframe {
     padding: 9px 10px;
   }
 
-  .header-actions {
-    grid-column: 1 / -1;
-    justify-self: stretch;
-    justify-content: space-between;
+  .topbar-left {
+    display: contents;
+  }
+
+  .brand {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .topbar .puzzle-title {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    text-align: right;
+  }
+
+  .view-controls {
+    grid-column: 1;
+    grid-row: 2;
     gap: 6px;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .header-actions {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    gap: 6px;
+  }
+
+  .controls-left,
+  .controls-right {
+    gap: 6px;
+  }
+
+  .shuffle-toggle {
+    width: 30px;
+    height: 30px;
   }
 
   /* No room for a side column, so the lookup becomes a short strip on top. */
@@ -1027,7 +1221,8 @@ iframe {
     font-size: 18px;
   }
 
-  .controls > button {
+  .controls-left > button:not(.shuffle-toggle),
+  .controls-right > button {
     width: 42px;
     height: 42px;
     padding: 0;
@@ -1039,12 +1234,11 @@ iframe {
     gap: 8px;
   }
 
-  .steps button {
-    width: 14px;
-  }
-
-  .steps {
-    gap: 5px;
+  .pager button {
+    min-width: 24px;
+    height: 24px;
+    padding: 0 4px;
+    font-size: 11px;
   }
 
   .game-menu {
@@ -1058,15 +1252,17 @@ iframe {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .controls > button {
-    transition: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
   }
 
-  .game-menu {
-    transition: none;
-  }
-
-  .steps button {
-    transition: none;
+  button:not(:disabled):active,
+  .add-game-button:hover {
+    transform: none;
   }
 }
