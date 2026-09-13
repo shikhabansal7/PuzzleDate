@@ -95,17 +95,17 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 ## Share the Chrome extension
 
 Puzzle Date's companion Chrome extension embeds the complete built-in game
-rotation. Version 1.0.20 also registers the hostname of each game added through
+rotation. Version 1.0.21 also registers the hostname of each game added through
 the plus button so that game can embed inside Puzzle Date.
 
-Version 1.0.20 adds right-click lookup. Select a word inside a game and
+Version 1.0.21 adds right-click lookup. Select a word inside a game and
 right-click it, and Puzzle Date's word lookup searches it — a cross-origin game
 frame hides its selection from the page, so the extension relays the highlighted
 text out. The game's own context menu is only replaced when text is actually
 selected, and only up to 60 characters; right-clicking with nothing selected
 behaves normally.
 
-Version 1.0.20 restores ad blocking on the embedded games. The games added whole
+Version 1.0.21 restores ad blocking on the embedded games. The games added whole
 header-bidding stacks that the previous list did not cover, so ads reappeared
 even though the blocking code had not changed. Every embedded game was reloaded
 and its third-party requests audited, taking the blocklist from 23 domains to
@@ -114,22 +114,26 @@ and its third-party requests audited, taking the blocklist from 23 domains to
 consent gates, login providers, fonts and generic CDNs are still deliberately
 left alone.
 
-Version 1.0.20 lets six more games follow Puzzle Date's global date picker.
+Version 1.0.21 lets six more games follow Puzzle Date's global date picker.
 Verticle, FoxiMax, Poople, Unwordle, Waffle, and Word Salad have no archive URL
 but derive their puzzle from the client clock, so the extension shifts the clock
 inside those game frames only, and only while a past date is selected.
 
-Version 1.0.20 makes **Start Over** reset the puzzle you are actually looking at
+Version 1.0.21 makes **Start Over** reset the puzzle you are actually looking at
 when Puzzle Date's global date picker is set to a past day. Word 500 archive
 puzzles are stored under their own `arc_<lang><level>_<date>_*` keys, so the
 reset now clears those instead of silently wiping the live daily puzzle.
 
-Version 1.0.20 keeps the ← and → keys working while a game iframe holds keyboard
-focus. A cross-origin game frame swallows key events, so the extension relays
-arrow presses that the game itself does not use back to Puzzle Date. Arrow keys
-the game handles, and arrow keys typed into its inputs, are left alone.
+Version 1.0.21 moves puzzle navigation to **⌘ + ← / →** (Ctrl elsewhere). Bare
+arrow keys now belong entirely to the game, which matters for puzzles that use
+them to move a cursor. The chord works while a game iframe holds keyboard focus:
+a cross-origin frame swallows key events, so the extension relays the chord back
+to Puzzle Date. Because ⌘ + ← / → is also the browser's back/forward on macOS,
+both the page and the relay call `preventDefault()` so navigating the rotation
+does not navigate history. Chords the game handles itself, and chords typed into
+its inputs, are left alone.
 
-Version 1.0.20 expands audited ad blocking across embedded games, including
+Version 1.0.21 expands audited ad blocking across embedded games, including
 Word 500's verified Raptive and video-ad services and narrow game-specific ad
 paths, only while games are embedded inside Puzzle Date. Next-game preload warms
 network resources without creating the next iframe, so game timers do not start
@@ -155,6 +159,14 @@ the page, with a Google link for anything it misses.
   extension reads it and relays it out. Puzzle Date accepts the relay only from
   the active game frame's own window, so another frame cannot drive the panel.
   A collapsed panel reopens itself for the result.
+
+## Game zoom
+
+A zoom selector in the title bar scales the embedded game between 50% and 200%,
+remembered in `localStorage` under `puzzle-date-zoom`. It is applied purely in
+Puzzle Date — the frame is counter-sized (`width: 100/zoom%`) and then
+`transform: scale()`d, so the scaled result still fills the pane exactly. No
+extension needed, and the game's own storage is untouched.
 
 ## Global puzzle date
 
@@ -228,17 +240,17 @@ This writes `public/downloads/puzzle-date-game-reset.zip`. To install it:
 5. Refresh Puzzle Date if it was already open.
 
 Chrome does not automatically replace a manually loaded extension. To upgrade
-an existing installation to version 1.0.20:
+an existing installation to version 1.0.21:
 
 1. Download the new ZIP and unzip it to a new folder.
 2. Open `chrome://extensions`.
 3. Remove the old **Puzzle Date Game Reset** card.
 4. Click **Load unpacked** and select the new folder that directly contains
    `manifest.json`.
-5. Refresh Puzzle Date and confirm the extension card shows version 1.0.20.
+5. Refresh Puzzle Date and confirm the extension card shows version 1.0.21.
 
 The light beside Puzzle Date's **Extension** button is red when the extension is
-missing, yellow when it needs an update, and green when version 1.0.20 is ready.
+missing, yellow when it needs an update, and green when version 1.0.21 is ready.
 
 The framing rules are limited to iframe requests initiated by Puzzle Date (or
 localhost during development), to the configured built-in domains and custom

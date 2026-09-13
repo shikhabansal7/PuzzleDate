@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.20") fail("release version must be 1.0.20");
+if (manifest.version !== "1.0.21") fail("release version must be 1.0.21");
 if (manifest.content_scripts?.[0]?.run_at !== "document_start") {
   fail("app content script must run at document_start to minimize the frame-policy race");
 }
@@ -151,7 +151,8 @@ for (const required of [
   'const marker = "puzzleDateArrowForwarding"',
   'event.key !== "ArrowLeft" && event.key !== "ArrowRight"',
   "if (event.defaultPrevented) return",
-  "event.altKey || event.ctrlKey || event.metaKey || event.shiftKey",
+  "if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return",
+  "event.preventDefault()",
   "target.isContentEditable",
   'target.matches("input, textarea, select")',
   "window.parent.postMessage",
@@ -525,7 +526,7 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.20"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.21"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
@@ -568,6 +569,14 @@ for (const required of [
   "setLookupCollapsed",
   "aria-expanded={!lookupCollapsed}",
   "hidden={lookupCollapsed}",
+  'const ZOOM_STORAGE_KEY = "puzzle-date-zoom"',
+  "const ZOOM_LEVELS = [",
+  "ZOOM_LEVELS.includes(savedZoom)",
+  "transform: `scale(${zoom})`",
+  "width: `${100 / zoom}%`",
+  "const isNavChord = (event",
+  "(event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey",
+  "if (!isNavChord(event)) return",
 ]) {
   if (!pageSource.includes(required)) fail(`app is missing ${required}`);
 }
@@ -593,8 +602,8 @@ for (const [relativePath, source] of [
   ["README.md", await readFile(path.join(projectRoot, "README.md"), "utf8")],
   ["public/extension-install.html", await readFile(path.join(projectRoot, "public", "extension-install.html"), "utf8")],
 ]) {
-  if (!source.includes("Version 1.0.20") && !source.includes("version 1.0.20")) {
-    fail(`${relativePath} must document release 1.0.20`);
+  if (!source.includes("Version 1.0.21") && !source.includes("version 1.0.21")) {
+    fail(`${relativePath} must document release 1.0.21`);
   }
   if (!source.includes("without creating the next iframe")) {
     fail(`${relativePath} must explain timer-safe preload`);

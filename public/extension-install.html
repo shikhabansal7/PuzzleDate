@@ -110,7 +110,7 @@
         make “Start Over” work for supported games.
       </p>
       <p>
-        Version 1.0.20 adds right-click lookup: highlight a word inside a game,
+        Version 1.0.21 adds right-click lookup: highlight a word inside a game,
         right-click it, and Puzzle Date's word lookup searches it. A game frame
         hides its selection from the page, so the extension passes the
         highlighted text out. Right-clicking with nothing selected still shows
@@ -127,9 +127,10 @@
         It also makes “Start Over” reset the puzzle you are actually
         looking at when Puzzle Date's date picker is set to a past day, instead
         of clearing the live daily puzzle.
-        It keeps the ← and → keys working while a game iframe holds
-        keyboard focus, by relaying arrow presses the game itself does not use
-        back to Puzzle Date.
+        Puzzle navigation is now <strong>⌘ + ← / →</strong> (Ctrl on Windows and
+        Linux), leaving bare arrow keys to the game. The chord keeps working
+        while a game frame has keyboard focus, and it no longer triggers the
+        browser's back/forward.
         It expands audited ad blocking across embedded games—including
         Word 500's verified services and narrow game-specific ad paths. Next-game
         preload warms network resources without creating the next iframe, so a
@@ -149,7 +150,7 @@
       <p>
         In Puzzle Date, the light beside <strong>Extension</strong> is red when
         the extension is missing, yellow when an update is available, and green
-        when version 1.0.20 is ready.
+        when version 1.0.21 is ready.
       </p>
 
       <h2>Install in Google Chrome</h2>
@@ -166,14 +167,14 @@
 
       <h2>Update an existing installation</h2>
       <ol>
-        <li>Download and unzip the new <strong>version 1.0.20</strong> folder.</li>
+        <li>Download and unzip the new <strong>version 1.0.21</strong> folder.</li>
         <li>Open <code>chrome://extensions</code>.</li>
         <li>
           On the Puzzle Date Game Reset card, click <strong>Remove</strong>, then
           choose <strong>Load unpacked</strong> and select the new folder that
           directly contains <code>manifest.json</code>.
         </li>
-        <li>Refresh Puzzle Date. The extension card should show version 1.0.20.</li>
+        <li>Refresh Puzzle Date. The extension card should show version 1.0.21.</li>
       </ol>
 
       <h2>What “Start Over” resets</h2>

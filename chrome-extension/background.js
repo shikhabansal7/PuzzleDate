@@ -323,7 +323,8 @@ const forwardArrowKeys = () => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     // The game handled the key itself, so Puzzle Date must not also navigate.
     if (event.defaultPrevented) return;
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    // Bare arrows stay with the game; only the command chord navigates.
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
 
     const target = event.target;
     if (
@@ -334,6 +335,8 @@ const forwardArrowKeys = () => {
       return;
     }
 
+    // On macOS this chord is the browser's back/forward, so claim it.
+    event.preventDefault();
     window.parent.postMessage(
       {
         source: "puzzle-date-extension",

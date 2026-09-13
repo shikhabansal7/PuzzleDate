@@ -74,8 +74,24 @@ Built-ins: Connections (NYT), Word 500, FoxiMax, Verticle, Waffle, Unwordle, 4 �
   Connections; otherwise the default order is used.
 - **Shuffle rest** Fisher-Yates-shuffles everything after index 0 (Connections stays
   first), resets to index 0, and persists.
-- Navigation: ← / → keys (ignored while typing in an input/textarea/select/contenteditable),
-  Previous/Next buttons, numbered step dots, and a hover/focus "Jump to a game" menu.
+- Navigation: **⌘/Ctrl + ← / →** (`isNavChord`), Previous/Next buttons, numbered step
+  dots, and a hover/focus "Jump to a game" menu. Bare arrows deliberately do **not**
+  navigate — they belong to games that move a cursor with them. Chords are ignored
+  while typing in an input/textarea/select/contenteditable, and when Alt or Shift is
+  held.
+- **Both the page and the frame relay call `preventDefault()` on the chord**, because
+  ⌘ + ← / → is the browser's back/forward on macOS. Without it, navigating the
+  rotation would also navigate history.
+
+### Game zoom
+
+A `<select>` in the topbar scales the frame across `ZOOM_LEVELS` (0.5–2), persisted at
+`puzzle-date-zoom`. Applied as inline style: the frame is counter-sized to
+`100/zoom %` and then `transform: scale(zoom)` with `transform-origin: top left`, so
+the scaled result still fills `.frame-wrap` exactly (verified at 0.5/1/1.5/2). Values
+outside `ZOOM_LEVELS` fall back to 1, so a hand-edited localStorage value cannot
+produce a broken layout. Purely app-side — no extension, and the game's storage is
+untouched.
 
 ### Arrow keys while the game frame has focus
 
@@ -89,8 +105,9 @@ arrow presses. `page.tsx` accepts the message only when
 navigation.
 
 The relay deliberately stays out of the game's way — it skips the key when
-`event.defaultPrevented` (the game handled it), when any modifier is held, and when
-the target is an input/textarea/select/contenteditable. It self-guards against double
+`event.defaultPrevented` (the game handled it), when it is **not** the ⌘/Ctrl chord,
+when Alt or Shift is held, and when the target is an
+input/textarea/select/contenteditable. It self-guards against double
 registration via a `puzzleDateArrowForwarding` marker on `documentElement`.
 
 **Without the extension this cannot be fixed.** For games embedded without it, the

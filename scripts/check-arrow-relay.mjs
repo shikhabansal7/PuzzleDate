@@ -20,6 +20,7 @@ class StubElement {
 
 const run = (event) => {
   const posted = [];
+  let prevented = false;
   let handler;
   const sandbox = {
     document: { documentElement: { dataset: {} } },
@@ -37,32 +38,59 @@ const run = (event) => {
     `${body}\nreturn forwardArrowKeys;`,
   );
   factory(sandbox.document, sandbox.HTMLElement, sandbox.window)();
-  handler({ altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, defaultPrevented: false, target: new StubElement(), ...event });
-  return posted;
+  handler({
+    altKey: false, ctrlKey: false, metaKey: false, shiftKey: false,
+    defaultPrevented: false, target: new StubElement(),
+    preventDefault: () => { prevented = true; },
+    ...event,
+  });
+  return { posted, prevented };
 };
 
-const arrow = (key) => ({ key });
+// Navigation is the command chord now, not a bare arrow.
+const chord = (key, modifier = "metaKey") => ({ key, [modifier]: true });
+const relayed = (key) => [[
+  { source: "puzzle-date-extension", type: "PUZZLE_DATE_ARROW_KEY", key },
+  "*",
+]];
 
-// Forwards unhandled arrow keys to the parent frame.
+// Command (macOS) and Control (elsewhere) both navigate.
 for (const key of ["ArrowLeft", "ArrowRight"]) {
-  assert.deepEqual(run(arrow(key)), [[
-    { source: "puzzle-date-extension", type: "PUZZLE_DATE_ARROW_KEY", key },
-    "*",
-  ]]);
+  for (const modifier of ["metaKey", "ctrlKey"]) {
+    assert.deepEqual(
+      run(chord(key, modifier)),
+      { posted: relayed(key), prevented: true },
+      `${modifier}+${key} should navigate`,
+    );
+  }
+}
+
+// A bare arrow now belongs to the game, and must not be swallowed.
+for (const key of ["ArrowLeft", "ArrowRight"]) {
+  assert.deepEqual(
+    run({ key }),
+    { posted: [], prevented: false },
+    `bare ${key} must reach the game`,
+  );
 }
 
 // Leaves everything else to the game.
-assert.deepEqual(run(arrow("ArrowUp")), []);
-assert.deepEqual(run({ key: "a" }), []);
-assert.deepEqual(run({ ...arrow("ArrowLeft"), defaultPrevented: true }), []);
-assert.deepEqual(run({ ...arrow("ArrowLeft"), ctrlKey: true }), []);
-assert.deepEqual(run({ ...arrow("ArrowLeft"), metaKey: true }), []);
-assert.deepEqual(run({ ...arrow("ArrowLeft"), altKey: true }), []);
-assert.deepEqual(run({ ...arrow("ArrowLeft"), shiftKey: true }), []);
-assert.deepEqual(run({ ...arrow("ArrowRight"), target: new StubElement({ tag: "input" }) }), []);
-assert.deepEqual(run({ ...arrow("ArrowRight"), target: new StubElement({ tag: "textarea" }) }), []);
-assert.deepEqual(run({ ...arrow("ArrowRight"), target: new StubElement({ tag: "select" }) }), []);
-assert.deepEqual(run({ ...arrow("ArrowRight"), target: new StubElement({ isContentEditable: true }) }), []);
+assert.deepEqual(run(chord("ArrowUp")), { posted: [], prevented: false });
+assert.deepEqual(run({ key: "a", metaKey: true }), { posted: [], prevented: false });
+assert.deepEqual(run({ ...chord("ArrowLeft"), defaultPrevented: true }), { posted: [], prevented: false });
+assert.deepEqual(run({ ...chord("ArrowLeft"), altKey: true }), { posted: [], prevented: false });
+assert.deepEqual(run({ ...chord("ArrowLeft"), shiftKey: true }), { posted: [], prevented: false });
+for (const tag of ["input", "textarea", "select"]) {
+  assert.deepEqual(
+    run({ ...chord("ArrowRight"), target: new StubElement({ tag }) }),
+    { posted: [], prevented: false },
+    `${tag} should keep the chord`,
+  );
+}
+assert.deepEqual(
+  run({ ...chord("ArrowRight"), target: new StubElement({ isContentEditable: true }) }),
+  { posted: [], prevented: false },
+);
 
 // Double injection into the same frame must not double-register.
 {

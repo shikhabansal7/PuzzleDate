@@ -23,7 +23,7 @@ type ResetStrategy =
   | "poople-current"
   | "custom-clear-all";
 
-const EXPECTED_EXTENSION_VERSION = "1.0.20";
+const EXPECTED_EXTENSION_VERSION = "1.0.21";
 
 const validExtensionVersion = (value: unknown) =>
   typeof value === "string" && /^\d+\.\d+\.\d+$/.test(value)
@@ -138,6 +138,13 @@ const CLOCK_SHIM_URLS = new Set([
 
 const ARCHIVE_STORAGE_KEY = "puzzle-date-archive-date";
 const LOOKUP_COLLAPSED_KEY = "puzzle-date-lookup-collapsed";
+const ZOOM_STORAGE_KEY = "puzzle-date-zoom";
+
+const ZOOM_LEVELS = [0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+
+// Command on macOS, Control elsewhere. Alt and Shift are left to the game.
+const isNavChord = (event: { metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }) =>
+  (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey;
 
 const isoToday = () => {
   const now = new Date();
@@ -277,6 +284,7 @@ export default function Home() {
   const [lookupSenses, setLookupSenses] = useState<DictionarySense[]>([]);
   const [lookupError, setLookupError] = useState("");
   const [lookupCollapsed, setLookupCollapsed] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const lookupRequestRef = useRef<AbortController | null>(null);
   const pendingCustomHostsRef = useRef<string[]>([]);
   const activePuzzle = orderedPuzzles[activeIndex];
@@ -529,8 +537,14 @@ export default function Home() {
       ) {
         return;
       }
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      // Bare arrows belong to the game now; only the command chord navigates.
+      if (!isNavChord(event)) return;
+
+      // On macOS this chord is the browser's back/forward, so claim it.
+      event.preventDefault();
       if (event.key === "ArrowLeft") goPrevious();
-      if (event.key === "ArrowRight") goNext();
+      else goNext();
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -647,7 +661,15 @@ export default function Home() {
     if (window.localStorage.getItem(LOOKUP_COLLAPSED_KEY) === "true") {
       setLookupCollapsed(true);
     }
+    const savedZoom = Number(window.localStorage.getItem(ZOOM_STORAGE_KEY));
+    if (ZOOM_LEVELS.includes(savedZoom)) setZoom(savedZoom);
   }, []);
+
+  const changeZoom = (value: number) => {
+    const next = ZOOM_LEVELS.includes(value) ? value : 1;
+    setZoom(next);
+    window.localStorage.setItem(ZOOM_STORAGE_KEY, String(next));
+  };
 
   const toggleLookup = () => {
     setLookupCollapsed((collapsed) => {
@@ -808,6 +830,23 @@ export default function Home() {
               </button>
             )}
           </div>
+          <div className="zoom-control">
+            <label className="visually-hidden" htmlFor="game-zoom">
+              Game zoom
+            </label>
+            <select
+              id="game-zoom"
+              value={zoom}
+              onChange={(event) => changeZoom(Number(event.target.value))}
+              title="Zoom the embedded game"
+            >
+              {ZOOM_LEVELS.map((level) => (
+                <option key={level} value={level}>
+                  {Math.round(level * 100)}%
+                </option>
+              ))}
+            </select>
+          </div>
           <button className="utility-button" type="button" onClick={shuffleRest}>
             Shuffle rest
           </button>
@@ -913,14 +952,17 @@ export default function Home() {
             >
               ×
             </button>
-            <p className="eyebrow">Chrome extension · Version 1.0.20</p>
+            <p className="eyebrow">Chrome extension · Version 1.0.21</p>
             <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
             <p>
               Install the extension once to embed supported games and let Puzzle
               Date reset them from inside the app.
             </p>
             <p>
-              Version 1.0.20 adds right-click lookup: highlight a word inside a
+              Version 1.0.21 moves puzzle navigation to ⌘ + ← / → (Ctrl on
+              Windows and Linux), so bare arrow keys belong to the game. The
+              chord works even while a game frame has keyboard focus.
+              It adds right-click lookup: highlight a word inside a
               game and right-click it to search it in the word lookup panel.
               It also restores ad blocking on the embedded games, which
               added new advertising partners the old list did not cover. The
@@ -950,7 +992,7 @@ export default function Home() {
               href="/PuzzleDate/downloads/puzzle-date-game-reset.zip"
               download
             >
-              Download extension 1.0.20
+              Download extension 1.0.21
             </a>
             <div className="extension-guide-steps">
               <section aria-labelledby="new-install-title">
@@ -972,14 +1014,14 @@ export default function Home() {
                 <h3 id="update-install-title">Already installed?</h3>
                 <ol>
                   <li>Remove the old Puzzle Date extension in Chrome.</li>
-                  <li>Download and unzip version 1.0.20.</li>
+                  <li>Download and unzip version 1.0.21.</li>
                   <li>Load the new folder, then refresh Puzzle Date.</li>
                 </ol>
               </section>
             </div>
             <p>
               The light beside Extension is red when it is missing, yellow when
-              an update is available, and green when version 1.0.20 is ready.
+              an update is available, and green when version 1.0.21 is ready.
             </p>
             <p className="extension-reset-warning">
               <strong>Custom-game warning:</strong> Start Over clears all local
@@ -1120,6 +1162,13 @@ export default function Home() {
             allow="fullscreen; clipboard-read; clipboard-write; storage-access"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-presentation"
             data-custom-game={activePuzzle.custom ? "true" : undefined}
+            // Counter-size the frame so the scaled result still fills the pane.
+            style={{
+              width: `${100 / zoom}%`,
+              height: `${100 / zoom}%`,
+              transform: `scale(${zoom})`,
+              transformOrigin: "top left",
+            }}
             onPointerLeave={() => appShellRef.current?.focus()}
           />
         )}
@@ -1184,7 +1233,7 @@ export default function Home() {
               />
             ))}
           </div>
-          <span className="shortcut">Use ← → keys</span>
+          <span className="shortcut">Use ⌘ / Ctrl + ← →</span>
         </div>
 
         {activeIndex < orderedPuzzles.length - 1 ? (

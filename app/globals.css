@@ -177,6 +177,21 @@ h1 {
   border-color: var(--green);
 }
 
+.zoom-control select {
+  padding: 7px 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.zoom-control select:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
 .game-menu-note {
   margin-left: auto;
   color: #8b8d86;
@@ -950,7 +965,8 @@ iframe {
     display: none;
   }
 
-  .date-control input {
+  .date-control input,
+  .zoom-control select {
     padding: 5px 6px;
     font-size: 9px;
   }
