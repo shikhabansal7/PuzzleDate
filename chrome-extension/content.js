@@ -27,6 +27,9 @@ const RESET_STRATEGIES = new Set([
   "four-by-three-current",
   "full-circle-current",
   "poople-current",
+  // Fresh Start works on any configured game, so the background verifies the
+  // frame's own hostname rather than taking one from this page.
+  "snapshot-restore",
 ]);
 const MAX_CUSTOM_HOSTS = 100;
 const normalizeHostnames = (value) => {

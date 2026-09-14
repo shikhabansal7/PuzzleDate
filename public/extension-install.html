@@ -110,7 +110,15 @@
         make “Start Over” work for supported games.
       </p>
       <p>
-        Version 1.0.21 adds right-click lookup: highlight a word inside a game,
+        Version 1.0.22 adds <strong>Fresh Start</strong> beside “Start Over”. It
+        remembers what a game had stored before the day's play and puts that
+        back, so it needs no list of the game's own storage keys, survives a
+        developer renaming one, and works for games you add yourself. “Start
+        Over” is unchanged and stays the precise option where a game has one.
+        Fresh Start has nothing to restore until you have opened a game through
+        Puzzle Date that day, and it cannot reach games that keep progress on a
+        server.
+        It also adds right-click lookup: highlight a word inside a game,
         right-click it, and Puzzle Date's word lookup searches it. A game frame
         hides its selection from the page, so the extension passes the
         highlighted text out. Right-clicking with nothing selected still shows
@@ -150,7 +158,7 @@
       <p>
         In Puzzle Date, the light beside <strong>Extension</strong> is red when
         the extension is missing, yellow when an update is available, and green
-        when version 1.0.21 is ready.
+        when version 1.0.22 is ready.
       </p>
 
       <h2>Install in Google Chrome</h2>
@@ -167,14 +175,14 @@
 
       <h2>Update an existing installation</h2>
       <ol>
-        <li>Download and unzip the new <strong>version 1.0.21</strong> folder.</li>
+        <li>Download and unzip the new <strong>version 1.0.22</strong> folder.</li>
         <li>Open <code>chrome://extensions</code>.</li>
         <li>
           On the Puzzle Date Game Reset card, click <strong>Remove</strong>, then
           choose <strong>Load unpacked</strong> and select the new folder that
           directly contains <code>manifest.json</code>.
         </li>
-        <li>Refresh Puzzle Date. The extension card should show version 1.0.21.</li>
+        <li>Refresh Puzzle Date. The extension card should show version 1.0.22.</li>
       </ol>
 
       <h2>What “Start Over” resets</h2>

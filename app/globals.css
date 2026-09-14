@@ -261,6 +261,14 @@ h1 {
   color: var(--green);
 }
 
+.reset-notice {
+  max-width: 220px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.3;
+  animation: fade-in var(--fast) var(--ease);
+}
+
 .date-control {
   display: flex;
   align-items: center;

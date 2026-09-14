@@ -15,7 +15,7 @@ const manifest = JSON.parse(await readFile(path.join(extensionDirectory, "manife
 const rules = JSON.parse(await readFile(path.join(extensionDirectory, "rules.json"), "utf8"));
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (manifest.version !== "1.0.21") fail("release version must be 1.0.21");
+if (manifest.version !== "1.0.22") fail("release version must be 1.0.22");
 if (manifest.content_scripts?.[0]?.run_at !== "document_start") {
   fail("app content script must run at document_start to minimize the frame-policy race");
 }
@@ -508,6 +508,54 @@ if (/\b(?:accept all|allow all|agree|i accept|i agree)\b/i.test(backgroundSource
 if (/document\.querySelectorAll\(\s*['"]button/i.test(backgroundSource)) {
   fail("consent controls must be searched only inside known containers");
 }
+
+// Fresh Start is the key-name-agnostic reset: it restores the snapshot taken
+// before the day's play instead of an audited list of the game's own keys.
+for (const required of [
+  'const SNAPSHOT_KEY = "__puzzleDateSnapshot"',
+  "const captureStorageSnapshot = (snapshotKey, dayKey) =>",
+  "const restoreStorageSnapshot = (snapshotKey, dayKey) =>",
+  'message.strategy === "snapshot-restore"',
+  "parentFrameId !== 0",
+  "await getAdBlockRuleForTab(tabId)",
+  "func: captureStorageSnapshot,",
+  "func = restoreStorageSnapshot;",
+  'chrome.runtime.getURL("rules.json")',
+  "gameHostnames.has(hostname.replace(/^www\\./, \"\"))",
+]) {
+  if (!backgroundSource.includes(required)) {
+    fail(`snapshot reset is missing ${required}`);
+  }
+}
+if (/"snapshot-restore":/.test(backgroundSource)) {
+  fail("snapshot reset must stay origin-agnostic, not gain a fixed origin");
+}
+const snapshotCapture = backgroundSource.match(
+  /const captureStorageSnapshot = \(snapshotKey, dayKey\) => \{([\s\S]*?)\n\};/,
+)?.[1];
+const snapshotRestore = backgroundSource.match(
+  /const restoreStorageSnapshot = \(snapshotKey, dayKey\) => \{([\s\S]*?)\n\};/,
+)?.[1];
+if (!snapshotCapture || !snapshotRestore) fail("snapshot reset implementation is missing");
+// One capture per puzzle day: a second would fold today's play into the baseline.
+if (!snapshotCapture.includes("stored.day === dayKey")) {
+  fail("snapshot capture must write only once per puzzle day");
+}
+if (!snapshotRestore.includes("stored.day !== dayKey")) {
+  fail("snapshot restore must refuse a snapshot from another puzzle day");
+}
+if (!snapshotRestore.includes("localStorage.removeItem(key)")) {
+  fail("snapshot restore must remove keys the game added during play");
+}
+if (snapshotRestore.includes("localStorage.clear()")) {
+  fail("snapshot restore must remove keys selectively, never clear the origin");
+}
+if (!snapshotRestore.includes("return { ok: true, reloadFromParent: true }")) {
+  fail("snapshot restore must ask the Puzzle Date parent to reload its iframe");
+}
+if (snapshotRestore.includes("window.location.reload")) {
+  fail("snapshot restore must not reload from inside the child frame");
+}
 for (const required of [
   'chrome.runtime.getManifest().version',
   'PUZZLE_DATE_EXTENSION_READY',
@@ -519,6 +567,7 @@ for (const required of [
   'type: "ENABLE_PUZZLE_DATE_AD_BLOCK"',
   "response?.ok && response.reloadFromParent",
   "iframe.src = currentSrc",
+  '"snapshot-restore"',
 ]) {
   if (!contentSource.includes(required)) fail(`content script is missing ${required}`);
 }
@@ -526,13 +575,16 @@ if (/cookie|consent|localStorage|sessionStorage|indexedDB|caches/i.test(contentS
   fail("content script must not manipulate cookies, consent, or browser storage");
 }
 for (const required of [
-  'const EXPECTED_EXTENSION_VERSION = "1.0.21"',
+  'const EXPECTED_EXTENSION_VERSION = "1.0.22"',
   'resetStrategy: "connections-current"',
   'extensionHealth === "current"',
   'extensionHealth === "outdated"',
   'extension-health-light--${extensionHealth}',
   'className="visually-hidden"',
   'resetStrategy: "custom-clear-all"',
+  'const freshStart = () => runReset("snapshot-restore")',
+  "Start Over",
+  "Fresh Start",
   'data-custom-game={activePuzzle.custom ? "true" : undefined}',
   "setCustomFrameRevision",
   'className="game-frame active"',
@@ -602,8 +654,8 @@ for (const [relativePath, source] of [
   ["README.md", await readFile(path.join(projectRoot, "README.md"), "utf8")],
   ["public/extension-install.html", await readFile(path.join(projectRoot, "public", "extension-install.html"), "utf8")],
 ]) {
-  if (!source.includes("Version 1.0.21") && !source.includes("version 1.0.21")) {
-    fail(`${relativePath} must document release 1.0.21`);
+  if (!source.includes("Version 1.0.22") && !source.includes("version 1.0.22")) {
+    fail(`${relativePath} must document release 1.0.22`);
   }
   if (!source.includes("without creating the next iframe")) {
     fail(`${relativePath} must explain timer-safe preload`);
@@ -625,6 +677,7 @@ for (const [label, script] of [
   ["clock shim", "check-clock-shim.mjs"],
   ["ad coverage", "check-ad-coverage.mjs"],
   ["selection lookup", "check-lookup-selection.mjs"],
+  ["snapshot reset", "check-snapshot-reset.mjs"],
 ]) {
   const result = spawnSync(
     process.execPath,

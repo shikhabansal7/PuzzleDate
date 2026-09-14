@@ -28,6 +28,7 @@ Deployed as a static site to **GitHub Pages** at `https://shikhabansal7.github.i
 | `scripts/check-clock-shim.mjs` | Replays each clock-derived game's real day formula through the shimmed `Date`. Spawned by the validator. |
 | `scripts/check-ad-coverage.mjs` | Replays real third-party hosts observed on each game against `AD_SERVING_DOMAINS`. Spawned by the validator. |
 | `scripts/check-lookup-selection.mjs` | Checks the right-click selection relay only hijacks the context menu for a real selection. Spawned by the validator. |
+| `scripts/check-snapshot-reset.mjs` | Round-trips Fresh Start's capture/restore against a stub `localStorage`. Spawned by the validator. |
 | `scripts/package-extension.mjs` | Validates, then zips the 4 extension files reproducibly into `public/downloads/`. |
 | `public/extension-install.html` | Standalone install/instructions page. |
 | `executions/*.json` | Historical task-plan records for past features. Documentation, not code. |
@@ -63,7 +64,8 @@ Built-ins: Connections (NYT), Word 500, FoxiMax, Verticle, Waffle, Unwordle, 4 �
 
 `ResetStrategy` is a closed union: `connections-current`, `word500-current`,
 `foximax-daily`, `verticle-current`, `four-by-three-current`, `full-circle-current`,
-`poople-current`, `custom-clear-all`.
+`poople-current`, `custom-clear-all`, `snapshot-restore` (the last is never a
+field on a `Puzzle` — it backs the Fresh Start button for every framable game).
 
 ### Rotation & ordering
 
@@ -318,6 +320,30 @@ Shown only when the active puzzle has a `resetStrategy` **and** is framable. If 
 extension is not ready, clicking it opens the extension guide instead. Otherwise it
 dispatches `RESET_ACTIVE_IFRAME` with the strategy.
 
+### Fresh Start (snapshot reset)
+
+A **second** reset button beside Start Over, shown for every framable puzzle.
+Dispatches the same `RESET_ACTIVE_IFRAME` event with the `snapshot-restore`
+strategy. Both go through `runReset(strategy)`.
+
+`snapshot-restore` is deliberately **not** a field on any `Puzzle` and has **no
+entry in `RESET_STRATEGY_ORIGINS`** — it is origin-agnostic by design, and the
+validator fails if it ever gains a fixed origin. The background verifies the
+target frame's hostname against the static rule's `requestDomains` (read back at
+runtime via `fetch(chrome.runtime.getURL("rules.json"))`, so adding a game stays
+a `rules.json` change) or the registered custom-game hostnames.
+
+Unlike Start Over, its result is surfaced: a `RESET_ACTIVE_IFRAME_RESULT`
+listener fills `resetNotice`, rendered as `.reset-notice` in the header. Fresh
+Start can legitimately have nothing to restore, so silence would read as a
+broken button. `goToPuzzle` clears the notice.
+
+**Neither replaces the other.** The audited per-game strategies stay the precise
+option — Connections resets exactly five fields and preserves archive mode and
+stats; 4 × 3 calls the page's own `resetPuzzle()`, which no storage snapshot can
+reproduce. Fresh Start is the key-name-agnostic fallback, and the only reset that
+covers a game with no strategy at all.
+
 ## Chrome extension
 
 MV3. Permissions: `activeTab`, `scripting`, `webNavigation`, `declarativeNetRequest`,
@@ -405,9 +431,51 @@ registered dynamic rule.
 | `full-circle-current` | Removes `fullCircleGameState`, reloads. |
 | `poople-current` | Removes `guesses`, reloads, then auto-dismisses the "How to play Poople" modal on the next `webNavigation.onCompleted`. |
 | `custom-clear-all` | **Destructive.** `localStorage.clear()` on the added game's origin, then reload. Wipes stats/settings/tutorial state. Surfaced as a warning in the UI and README. |
+| `snapshot-restore` | `restoreStorageSnapshot`. Not part of `resetCurrentPuzzle`; see below. |
 
 The extension only ever touches `localStorage`. The validator fails on any use of
 `sessionStorage`, `indexedDB`, `chrome.cookies`, `document.cookie`, or `caches`.
+
+### How the snapshot reset works
+
+`captureStorageSnapshot(SNAPSHOT_KEY, dayKey)` writes
+`__puzzleDateSnapshot = {day, data}` into **the game's own `localStorage`**.
+Deliberately not `chrome.storage`: per-origin for free, no new manifest
+permission, and it survives both a service-worker and a browser restart —
+`chrome.storage.session` would not, and a browser restart mid-day would then
+re-baseline on mid-game state.
+
+- Injected from a **second, separate `chrome.webNavigation.onCommitted`
+  listener**. Not a branch in the clock-shim one: the Puzzle Date tab check
+  (`getAdBlockRuleForTab`) is async, and an `await` in front of the shim would
+  put it behind the game's first clock read.
+- Gated on `frameId !== 0 && parentFrameId === 0` — that is the game frame; ad
+  iframes nested inside it are not — plus the tab having an ad-block rule, which
+  is the existing "this is a Puzzle Date tab" signal.
+- `dayKey` is `puzzleDateByTab.get(tabId) || isoToday()`, computed in the
+  **background**, never from the frame's own `new Date()` — the clock shim may or
+  may not have landed yet, and a snapshot keyed to the wrong day is the same bug
+  class as Word 500's `arc_` prefix. Archive play and live play keep separate
+  baselines.
+- **Written once per puzzle day.** A second capture mid-session would fold that
+  day's play into the baseline and make Fresh Start a no-op. The validator
+  asserts the `stored.day === dayKey` guard.
+
+`restoreStorageSnapshot` removes every key not in `data` (`removeItem`, never
+`clear()` — the validator fails on `clear()` here), writes the recorded values
+back, and returns `reloadFromParent: true` so the **content script** reassigns
+`iframe.src`, same as Connections. A Fresh Start on Connections also joins
+`pendingConnectionsPlay`, because it lands on the same Play splash.
+
+`scripts/check-snapshot-reset.mjs` runs both functions against a stub
+`localStorage` and asserts a capture → play → restore round-trip is exact,
+including keys the game added, edited and deleted. Run by `validate-extension`.
+
+**Known limits, by design.** The snapshot can only be what was there when Puzzle
+Date first framed the game that day — play the game in your own tab first and the
+baseline is mid-game (it reports this, it does not fail silently). Progress held
+on a server is untouchable: Chain It (Firestore) and a signed-in Connections
+account stay out of reach.
 
 ### Connections Play recovery
 

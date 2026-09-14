@@ -56,6 +56,13 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M20 4v4h-4" />
     </>
   ),
+  rewind: (
+    <>
+      <path d="M5 6v12" />
+      <path d="m12 7-5 5 5 5" />
+      <path d="m19 7-5 5 5 5" />
+    </>
+  ),
   calendar: (
     <>
       <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
@@ -124,9 +131,12 @@ type ResetStrategy =
   | "four-by-three-current"
   | "full-circle-current"
   | "poople-current"
-  | "custom-clear-all";
+  | "custom-clear-all"
+  // Not carried on any Puzzle: Fresh Start is offered for every framable game
+  // alongside whatever audited strategy that game already has.
+  | "snapshot-restore";
 
-const EXPECTED_EXTENSION_VERSION = "1.0.21";
+const EXPECTED_EXTENSION_VERSION = "1.0.22";
 
 const validExtensionVersion = (value: unknown) =>
   typeof value === "string" && /^\d+\.\d+\.\d+$/.test(value)
@@ -390,6 +400,7 @@ export default function Home() {
   const [lookupCollapsed, setLookupCollapsed] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [shuffleMode, setShuffleMode] = useState(false);
+  const [resetNotice, setResetNotice] = useState("");
   const lookupRequestRef = useRef<AbortController | null>(null);
   const pendingCustomHostsRef = useRef<string[]>([]);
   const activePuzzle = orderedPuzzles[activeIndex];
@@ -614,6 +625,7 @@ export default function Home() {
       const nextPuzzle = orderedPuzzles[nextIndex];
 
       setActiveIndex(nextIndex);
+      setResetNotice("");
       if (
         openExternal &&
         nextPuzzle.canEmbed === false &&
@@ -657,18 +669,37 @@ export default function Home() {
   }, [goNext, goPrevious]);
 
 
-  const reloadGame = () => {
+  // Fresh Start can legitimately have nothing to restore, so its result has to
+  // be said out loud rather than failing silently the way Start Over did.
+  useEffect(() => {
+    const handleResetResult = (event: Event) => {
+      const detail = (event as CustomEvent<{ ok?: boolean; error?: string }>).detail;
+      setResetNotice(detail?.ok ? "" : detail?.error ?? "Reset did not respond.");
+    };
+
+    window.addEventListener("RESET_ACTIVE_IFRAME_RESULT", handleResetResult);
+    return () =>
+      window.removeEventListener("RESET_ACTIVE_IFRAME_RESULT", handleResetResult);
+  }, []);
+
+  const runReset = (strategy: ResetStrategy | undefined) => {
     if (extensionStatus !== "ready") {
       setShowExtensionGuide(true);
       return;
     }
 
+    setResetNotice("");
     window.dispatchEvent(
       new CustomEvent("RESET_ACTIVE_IFRAME", {
-        detail: { strategy: activePuzzle.resetStrategy },
+        detail: { strategy },
       }),
     );
   };
+
+  const reloadGame = () => runReset(activePuzzle.resetStrategy);
+  // Restores the game's storage to the snapshot taken before today's play, so
+  // it needs no per-game key list and survives a developer renaming one.
+  const freshStart = () => runReset("snapshot-restore");
 
   // A mode, like a music player's shuffle: turning it off restores the running
   // order, and either way you stay on the game you were playing.
@@ -967,6 +998,11 @@ export default function Home() {
         </div>
 
         <div className="header-actions">
+          {resetNotice && (
+            <span className="reset-notice" role="status">
+              {resetNotice}
+            </span>
+          )}
           {activePuzzle.resetStrategy && canFramePuzzle(activePuzzle) && (
             <button
               className="utility-button"
@@ -975,6 +1011,17 @@ export default function Home() {
             >
               <Icon name="rotate" />
               <span className="button-label">Start Over</span>
+            </button>
+          )}
+          {canFramePuzzle(activePuzzle) && (
+            <button
+              className="utility-button"
+              type="button"
+              onClick={freshStart}
+              title="Put this game's storage back to how it was before today's play"
+            >
+              <Icon name="rewind" />
+              <span className="button-label">Fresh Start</span>
             </button>
           )}
           <button
@@ -1070,14 +1117,23 @@ export default function Home() {
             >
               <Icon name="close" />
             </button>
-            <p className="eyebrow">Chrome extension · Version 1.0.21</p>
+            <p className="eyebrow">Chrome extension · Version 1.0.22</p>
             <h2 id="extension-guide-title">Add Start Over to Puzzle Date</h2>
             <p>
               Install the extension once to embed supported games and let Puzzle
               Date reset them from inside the app.
             </p>
             <p>
-              Version 1.0.21 moves puzzle navigation to ⌘ + ← / → (Ctrl on
+              Version 1.0.22 adds <strong>Fresh Start</strong> next to Start
+              Over. It records what a game stored before the day&rsquo;s play and
+              puts that back, so it needs no list of the game&rsquo;s own storage
+              keys and keeps working when a developer renames one or when you add
+              a game of your own. Start Over is unchanged: where a game has an
+              audited reset, that one stays the precise option. Fresh Start has
+              nothing to restore until you have opened a game through Puzzle Date
+              at least once on the day in question, and it cannot reach games that
+              keep their progress on a server.
+              It moves puzzle navigation to ⌘ + ← / → (Ctrl on
               Windows and Linux), so bare arrow keys belong to the game. The
               chord works even while a game frame has keyboard focus.
               It adds right-click lookup: highlight a word inside a
@@ -1111,7 +1167,7 @@ export default function Home() {
               download
             >
               <Icon name="download" />
-              Download extension 1.0.21
+              Download extension 1.0.22
             </a>
             <div className="extension-guide-steps">
               <section aria-labelledby="new-install-title">
@@ -1133,14 +1189,14 @@ export default function Home() {
                 <h3 id="update-install-title">Already installed?</h3>
                 <ol>
                   <li>Remove the old Puzzle Date extension in Chrome.</li>
-                  <li>Download and unzip version 1.0.21.</li>
+                  <li>Download and unzip version 1.0.22.</li>
                   <li>Load the new folder, then refresh Puzzle Date.</li>
                 </ol>
               </section>
             </div>
             <p>
               The light beside Extension is red when it is missing, yellow when
-              an update is available, and green when version 1.0.21 is ready.
+              an update is available, and green when version 1.0.22 is ready.
             </p>
             <p className="extension-reset-warning">
               <strong>Custom-game warning:</strong> Start Over clears all local

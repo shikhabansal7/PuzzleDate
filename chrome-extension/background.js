@@ -7,6 +7,10 @@ const RESET_STRATEGY_ORIGINS = {
   "full-circle-current": "https://fullcirclefriday.com",
   "poople-current": "https://poople.io",
 };
+// Fresh Start keeps its baseline in the game's own localStorage: it is
+// per-origin for free, survives a service-worker or browser restart, and keeps
+// the extension's "only ever touches localStorage" rule literally true.
+const SNAPSHOT_KEY = "__puzzleDateSnapshot";
 const CUSTOM_GAMES_RULE_ID = 1000;
 const AD_BLOCK_RULES_PER_TAB = 3;
 const AD_BLOCK_RULE_ID_BASE = CUSTOM_GAMES_RULE_ID + 1;
@@ -261,6 +265,26 @@ const CLOCK_SHIM_ORIGINS = new Set([
 ]);
 
 const puzzleDateByTab = new Map();
+
+const isoToday = () => {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+};
+
+// The static rule already lists every built-in game domain, so reading it back
+// keeps "add a game" a change to rules.json rather than a second list here.
+let gameHostnamesPromise;
+const getGameHostnames = () => {
+  gameHostnamesPromise ??= fetch(chrome.runtime.getURL("rules.json"))
+    .then((response) => response.json())
+    .then((rules) => new Set(rules[0]?.condition?.requestDomains ?? []))
+    .catch(() => new Set());
+  return gameHostnamesPromise;
+};
 
 const isPastIsoDate = (value) => {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -522,6 +546,62 @@ const clearCustomGame = () => {
   return { ok: true };
 };
 
+// Runs in the game frame on every commit, before its own scripts. Records what
+// storage looked like before the day's play so Fresh Start can put it back
+// without knowing a single one of the game's key names.
+const captureStorageSnapshot = (snapshotKey, dayKey) => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(snapshotKey) ?? "null");
+    // Write once per puzzle day: a second capture would bake today's play in.
+    if (stored && stored.day === dayKey) return { ok: true, captured: false };
+    const data = {};
+    for (const key of Object.keys(localStorage)) {
+      if (key === snapshotKey) continue;
+      const value = localStorage.getItem(key);
+      if (typeof value === "string") data[key] = value;
+    }
+    localStorage.setItem(snapshotKey, JSON.stringify({ day: dayKey, data }));
+    return { ok: true, captured: true };
+  } catch {
+    // Private mode, a full quota, or a frame torn down mid-navigation. Fresh
+    // Start simply reports that it has no snapshot.
+    return { ok: false, error: "Snapshot could not be written." };
+  }
+};
+
+const restoreStorageSnapshot = (snapshotKey, dayKey) => {
+  let stored;
+  try {
+    stored = JSON.parse(localStorage.getItem(snapshotKey) ?? "null");
+  } catch {
+    return { ok: false, error: "Fresh Start snapshot is malformed." };
+  }
+  if (
+    !stored ||
+    typeof stored !== "object" ||
+    Array.isArray(stored) ||
+    !stored.data ||
+    typeof stored.data !== "object" ||
+    Array.isArray(stored.data)
+  ) {
+    return { ok: false, error: "Fresh Start has no snapshot for this game yet." };
+  }
+  if (stored.day !== dayKey) {
+    return { ok: false, error: "Fresh Start snapshot is from another puzzle day." };
+  }
+
+  for (const key of Object.keys(localStorage)) {
+    if (key === snapshotKey) continue;
+    if (!Object.prototype.hasOwnProperty.call(stored.data, key)) {
+      localStorage.removeItem(key);
+    }
+  }
+  for (const [key, value] of Object.entries(stored.data)) {
+    if (typeof value === "string") localStorage.setItem(key, value);
+  }
+  return { ok: true, reloadFromParent: true };
+};
+
 const resetCurrentPuzzle = (strategy) => {
   const allowedStrategies = new Set([
     "connections-current",
@@ -669,6 +749,28 @@ chrome.webNavigation.onCommitted.addListener(async ({ tabId, frameId, url }) => 
   }
 });
 
+// Deliberately a second listener rather than a branch in the one above: the
+// Puzzle Date tab check is async, and an await in front of the clock shim would
+// put it behind the game's first clock read.
+chrome.webNavigation.onCommitted.addListener(async ({ tabId, frameId, parentFrameId, url }) => {
+  // parentFrameId === 0 is the game frame itself; ads nested inside it are not.
+  if (frameId === 0 || parentFrameId !== 0) return;
+  if (!url.startsWith("http:") && !url.startsWith("https:")) return;
+  if (!(await getAdBlockRuleForTab(tabId))) return;
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      world: "MAIN",
+      injectImmediately: true,
+      func: captureStorageSnapshot,
+      args: [SNAPSHOT_KEY, puzzleDateByTab.get(tabId) || isoToday()],
+    });
+  } catch {
+    // Restricted or vanished frames simply never get a snapshot.
+  }
+});
+
 chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId, url }) => {
   if (frameId !== 0) await insertAdBlockCss(tabId, frameId);
 
@@ -796,7 +898,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   const expectedOrigin = RESET_STRATEGY_ORIGINS[message.strategy];
   const customReset = message.strategy === "custom-clear-all";
-  if (!expectedOrigin && !customReset) {
+  // Fresh Start is origin-agnostic by design, so it gets no RESET_STRATEGY_ORIGINS
+  // entry and is verified against the configured game and custom hostnames instead.
+  const snapshotReset = message.strategy === "snapshot-restore";
+  if (!expectedOrigin && !customReset && !snapshotReset) {
     sendResponse({ ok: false, error: "Unsupported reset strategy." });
     return;
   }
@@ -845,6 +950,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ ok: false, error: "Custom game hostname is not registered." });
           return;
         }
+      } else if (snapshotReset) {
+        const hostname = targetUrl.hostname.toLowerCase();
+        const gameHostnames = await getGameHostnames();
+        const dynamicRules = await chrome.declarativeNetRequest.getDynamicRules();
+        const registeredDomains = dynamicRules.find(
+          (rule) => rule.id === CUSTOM_GAMES_RULE_ID,
+        )?.condition?.requestDomains;
+        if (
+          !gameHostnames.has(hostname.replace(/^www\./, "")) &&
+          !(Array.isArray(registeredDomains) && registeredDomains.includes(hostname))
+        ) {
+          sendResponse({ ok: false, error: "Fresh Start does not match a configured game." });
+          return;
+        }
       } else if (targetUrl.origin !== expectedOrigin) {
         sendResponse({ ok: false, error: "Reset strategy does not match the active game." });
         return;
@@ -859,14 +978,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         pendingPoopleDismissals.add(`${tabId}:${target.frameId}`);
       }
 
+      let func = resetCurrentPuzzle;
+      let args = [message.strategy];
+      if (customReset) {
+        func = clearCustomGame;
+        args = [];
+      } else if (snapshotReset) {
+        func = restoreStorageSnapshot;
+        args = [SNAPSHOT_KEY, puzzleDateByTab.get(tabId) || isoToday()];
+      }
+
       const results = await chrome.scripting.executeScript({
         target: { tabId, frameIds: [target.frameId] },
         world: "MAIN",
-        func: customReset ? clearCustomGame : resetCurrentPuzzle,
-        args: customReset ? [] : [message.strategy],
+        func,
+        args,
       });
       const result = results[0]?.result;
       if (result?.ok && message.strategy === "connections-current") {
+        pendingConnectionsPlay.add(`${tabId}:${target.frameId}`);
+      }
+      // A Fresh Start on Connections lands on the same "Play" splash a strategy
+      // reset does, so it needs the same recovery click.
+      if (
+        result?.ok &&
+        snapshotReset &&
+        target.url.startsWith("https://www.nytimes.com/games/connections")
+      ) {
         pendingConnectionsPlay.add(`${tabId}:${target.frameId}`);
       }
       if (!result?.ok && message.strategy === "poople-current") {
